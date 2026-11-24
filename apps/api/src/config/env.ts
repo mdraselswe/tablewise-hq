@@ -1,3 +1,4 @@
+import { TimeZone } from "@tablewise/contracts";
 import { z } from "zod";
 
 /**
@@ -30,7 +31,7 @@ const EnvSchema = z.object({
   WEB_DIST_DIR: z.string().optional(),
 
   /** Trading-day boundary used for report defaults ("today"). */
-  BUSINESS_TIMEZONE: z.string().default("Asia/Dhaka"),
+  BUSINESS_TIMEZONE: TimeZone.default("Asia/Dhaka"),
   OUTBOX_POLL_INTERVAL_MS: z.coerce.number().int().min(100).max(60_000).default(1000),
   MIGRATIONS_DIR: z.string().default("migrations"),
   /** Apply pending migrations at startup (safe with many instances: guarded by an advisory lock). */

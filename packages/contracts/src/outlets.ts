@@ -1,7 +1,19 @@
 import { z } from "zod";
 
-const timeZones = new Set(Intl.supportedValuesOf("timeZone"));
-const TimeZone = z.string().refine((tz) => timeZones.has(tz), "Unknown IANA time zone");
+/**
+ * Any IANA zone the runtime understands, aliases included. `Intl.supportedValuesOf`
+ * lists canonical names only, so it would reject valid zones such as "UTC" and
+ * "Asia/Kolkata" (listed as "Asia/Calcutta"); constructing a formatter accepts both.
+ */
+function isTimeZone(value: string): boolean {
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: value });
+    return true;
+  } catch {
+    return false;
+  }
+}
+export const TimeZone = z.string().min(1).max(64).refine(isTimeZone, "Unknown IANA time zone");
 
 export const OutletCode = z
   .string()
