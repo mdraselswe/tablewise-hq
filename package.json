@@ -23,6 +23,7 @@
     "db:migrate": "pnpm --filter @tablewise/api db:migrate",
     "db:seed": "pnpm --filter @tablewise/api db:seed",
     "db:reset": "pnpm --filter @tablewise/api db:reset",
+    "db:replay-events": "pnpm --filter @tablewise/api db:replay-events",
     "prepare": "husky"
   },
   "lint-staged": {
