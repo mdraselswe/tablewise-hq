@@ -25,7 +25,10 @@ export const CreateSaleRequest = z.object({
 });
 export type CreateSaleRequest = z.infer<typeof CreateSaleRequest>;
 
-export const IdempotencyKey = z.uuid({ message: `${IDEMPOTENCY_KEY_HEADER} must be a UUID` }).optional();
+export const IdempotencyKey = z
+  .uuid({ message: `${IDEMPOTENCY_KEY_HEADER} must be a UUID` })
+  .overwrite((value) => value.toLowerCase())
+  .optional();
 
 export const ListSalesQuery = PaginationQuery.extend({
   ...DateRangeShape,

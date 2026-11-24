@@ -17,7 +17,8 @@ export class SalesController {
     const { sale, replayed } = await this.service.createSale({
       outletId: params.outletId,
       request: body,
-      idempotencyKey: req.header(IDEMPOTENCY_KEY_HEADER) ?? undefined,
+      // Already validated as a UUID; lowercased so the advisory lock and lookup see one spelling.
+      idempotencyKey: req.header(IDEMPOTENCY_KEY_HEADER)?.toLowerCase(),
       actor,
     });
     // A replay returns the original sale with 200, so clients can retry blindly.

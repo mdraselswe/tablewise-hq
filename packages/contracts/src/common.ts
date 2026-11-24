@@ -1,7 +1,11 @@
 import { z } from "zod";
 
-/** Every entity id is a UUID, so ids can be generated anywhere (HQ, an offline POS, another service). */
-export const Id = z.uuid();
+/**
+ * Every entity id is a UUID, so ids can be generated anywhere (HQ, an offline POS, another service).
+ * Lowercased on the way in: PostgreSQL returns UUIDs in lowercase, and comparing an
+ * uppercase id from a client with them in code would otherwise fail.
+ */
+export const Id = z.uuid().overwrite((value) => value.toLowerCase());
 
 /**
  * Money is always an integer number of minor units (poisha for BDT).

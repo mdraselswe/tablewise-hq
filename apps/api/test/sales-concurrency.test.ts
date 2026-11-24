@@ -176,6 +176,21 @@ describe("sales under concurrency", () => {
     expect(late.status).toBe(400);
   });
 
+  it("treats ids and Idempotency-Keys case-insensitively, as PostgreSQL does", async () => {
+    const key = randomUUID();
+    const upper = await sell([{ menuItemId: fixture.items.latte.toUpperCase(), quantity: 1 }], {
+      key: key.toUpperCase(),
+      outletId: fixture.outletA.id.toUpperCase(),
+    });
+    expect(upper.status).toBe(201);
+    expect(upper.body.outletId).toBe(fixture.outletA.id);
+
+    const retry = await sell([{ menuItemId: fixture.items.latte, quantity: 1 }], { key });
+    expect(retry.status).toBe(200);
+    expect(retry.body.id).toBe(upper.body.id);
+    expect(await stockOf(container.db, fixture.outletA.id, fixture.items.latte)).toBe(99);
+  });
+
   it("rolls back a failed sale completely, including its receipt number", async () => {
     const ok1 = await sell([{ menuItemId: fixture.items.latte, quantity: 1 }]);
     const failed = await sell([

@@ -128,7 +128,9 @@ function guard(definition: RouteDefinition): RequestHandler {
       throw new ForbiddenError("Your role cannot perform this action");
     }
     if (definition.outletParam && actor.role !== "HQ_ADMIN") {
-      const outletId = req.params[definition.outletParam];
+      // Runs before validation, so compare case-insensitively like PostgreSQL does for UUIDs.
+      const param = req.params[definition.outletParam];
+      const outletId = typeof param === "string" ? param.toLowerCase() : undefined;
       if (outletId !== actor.outletId) throw new ForbiddenError("You can only access your own outlet");
     }
     next();
