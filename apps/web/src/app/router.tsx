@@ -38,6 +38,7 @@ export const router = createBrowserRouter([
                     lazy: page(() => import("@/features/outlets/outlet-detail-page.tsx")),
                   },
                   { path: "menu", lazy: page(() => import("@/features/menu/menu-page.tsx")) },
+                  { path: "sales", lazy: page(() => import("@/features/sales/sales-page.tsx")) },
                 ],
               },
               {
@@ -47,6 +48,7 @@ export const router = createBrowserRouter([
                   { path: "pos", lazy: page(() => import("@/features/pos/pos-page.tsx")) },
                   { path: "kitchen", lazy: page(() => import("@/features/kitchen/kitchen-page.tsx")) },
                   { path: "inventory", lazy: page(() => import("@/features/inventory/inventory-page.tsx")) },
+                  { path: "sales", lazy: page(() => import("@/features/sales/sales-page.tsx")) },
                 ],
               },
               { path: "*", element: <NotFoundPage /> },
