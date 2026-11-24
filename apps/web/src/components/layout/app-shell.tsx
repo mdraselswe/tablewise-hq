@@ -9,9 +9,34 @@ import { Button } from "@/components/ui/button.tsx";
 import { Menu, MenuContent, MenuItem, MenuLabel, MenuSeparator, MenuTrigger } from "@/components/ui/menu.tsx";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet.tsx";
 import { isHq, useLogout, useSessionUser } from "@/features/auth/session.ts";
+import { type ConnectionState, useConnectionState } from "@/features/realtime/live-store.ts";
+import { useLiveUpdates } from "@/features/realtime/use-live-updates.ts";
 import { toggleTheme, useTheme } from "@/hooks/use-theme.ts";
 import { initials } from "@/lib/format.ts";
 import { Wordmark } from "./brand.tsx";
+
+const CONNECTION_COPY: Record<ConnectionState, { label: string; className: string }> = {
+  live: { label: "Live", className: "text-success" },
+  connecting: { label: "Connecting", className: "text-warning" },
+  offline: { label: "Offline", className: "text-destructive" },
+};
+
+function ConnectionBadge() {
+  const connection = useConnectionState();
+  const copy = CONNECTION_COPY[connection];
+  return (
+    <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground" aria-live="polite">
+      <span
+        className={cn(
+          "size-1.5 rounded-full bg-current",
+          copy.className,
+          connection === "live" && "live-dot",
+        )}
+      />
+      {copy.label}
+    </span>
+  );
+}
 
 function Navigation({ onNavigate }: { onNavigate?: () => void }) {
   const user = useSessionUser();
@@ -110,6 +135,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
     <div className="flex h-full flex-col gap-5 p-3">
       <div className="flex items-center justify-between px-1.5 pt-1.5">
         <Wordmark />
+        <ConnectionBadge />
       </div>
       <Context />
       <Navigation {...(onNavigate ? { onNavigate } : {})} />
@@ -139,6 +165,7 @@ function NavigationProgress() {
 export function AppShell() {
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+  useLiveUpdates(true);
 
   return (
     <div className="flex min-h-dvh">
