@@ -1,6 +1,7 @@
 import type { SessionUser } from "@tablewise/contracts";
 import {
   Boxes,
+  ChefHat,
   LayoutDashboard,
   type LucideIcon,
   ShoppingBasket,
@@ -23,6 +24,7 @@ export const HQ_NAV: NavItem[] = [
 
 export const OUTLET_NAV: NavItem[] = [
   { to: "/outlet/pos", label: "Point of sale", icon: ShoppingBasket },
+  { to: "/outlet/kitchen", label: "Kitchen display", icon: ChefHat },
   { to: "/outlet/inventory", label: "Inventory", icon: Boxes },
 ];
 
