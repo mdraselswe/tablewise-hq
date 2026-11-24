@@ -293,20 +293,28 @@ Reporting and platform tables are deliberately outside this diagram: they hold n
 
 Each index exists for a specific query.
 
-| Index                                                                                           | Serves                                                                           |
-| ----------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| `outlet_menu_items` PK `(outlet_id, menu_item_id)`                                              | An outlet's menu (the POS's main read) and the sale's pricing lookup.            |
-| `outlet_menu_items (menu_item_id)`                                                              | "Which outlets sell this item" on the menu item screen.                          |
-| `menu_items (category, name)`                                                                   | Menu lists grouped by category.                                                  |
-| `menu_items` GIN trigram on `name                                                               |                                                                                  | ' ' |     | sku` | "Contains" search in the HQ menu (`ILIKE '%latte%'`), which a B-tree cannot serve. |
-| `stock_levels` PK `(outlet_id, menu_item_id)`                                                   | The `FOR UPDATE` lock in every sale; the inventory screen.                       |
-| `stock_movements (outlet_id, created_at DESC)` and `(outlet_id, menu_item_id, created_at DESC)` | The audit trail, all items or one item, newest first.                            |
-| `stock_movements (reference_id)`                                                                | "Which stock movements did this sale cause".                                     |
-| `sales (outlet_id, receipt_seq)` unique                                                         | Gap-free numbering backstop; receipt lookup.                                     |
-| `sales (outlet_id, idempotency_key)` unique                                                     | Idempotent replay lookup.                                                        |
-| `sales (outlet_id, business_date DESC, ...)` and `(business_date)`                              | Sales history per outlet and across outlets for a date range.                    |
-| `tickets` partial index on open tickets                                                         | The kitchen board reads only open tickets, so the served backlog never slows it. |
-| `outbox_events` partial index where `published_at IS NULL`                                      | The relay's scan touches only pending events, however large the table grows.     |
+| Index                                                                                                                    | Serves                                                                                                      |
+| ------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------- |
+| `outlet_menu_items` PK `(outlet_id, menu_item_id)`                                                                       | An outlet's menu (the POS's main read) and the sale's pricing lookup.                                       |
+| `outlet_menu_items (menu_item_id)`                                                                                       | "Which outlets sell this item" on the menu item screen.                                                     |
+| `menu_items (category, name)`                                                                                            | Menu lists grouped by category.                                                                             |
+| `menu_items` GIN trigram on `name \|\| ' ' \|\| sku`                                                                     | "Contains" search in the HQ menu (`ILIKE '%latte%'`), which a B-tree cannot serve.                          |
+| `stock_levels` PK `(outlet_id, menu_item_id)`                                                                            | The `FOR UPDATE` lock in every sale; the inventory screen.                                                  |
+| `stock_movements (outlet_id, created_at DESC, id DESC)` and `(outlet_id, menu_item_id, created_at DESC, id DESC)`        | The audit trail, all items or one item, newest first, read by keyset.                                       |
+| `stock_movements (reference_id)`                                                                                         | "Which stock movements did this sale cause".                                                                |
+| `sales (outlet_id, receipt_seq)` unique                                                                                  | Gap-free numbering backstop; receipt lookup.                                                                |
+| `sales (outlet_id, idempotency_key)` unique                                                                              | Idempotent replay lookup.                                                                                   |
+| `sales (outlet_id, business_date DESC, occurred_at DESC, id DESC)` and `(business_date DESC, occurred_at DESC, id DESC)` | Sales history per outlet and across outlets; the full sort key lets a keyset page start with an index seek. |
+| `tickets` partial index on open tickets                                                                                  | The kitchen board reads only open tickets, so the served backlog never slows it.                            |
+| `outbox_events` partial index where `published_at IS NULL`                                                               | The relay's scan touches only pending events, however large the table grows.                                |
+
+### Large lists
+
+Only two tables grow without limit, and both are read with keyset pagination: `sales` and `stock_movements`. A page asks for "the next N rows after this one" (`(business_date, occurred_at, id) < (cursor row)` for sales, `(created_at, id)` for movements). PostgreSQL turns that into an index range scan on the indexes above, so page 5,000 costs the same as page 1, and a sale made while someone reads page 1 never shifts page 2. OFFSET pagination would read and throw away every skipped row instead.
+
+Totals are counted with `LIMIT 1001` inside the count, so a list says "1,000+" rather than counting a year of rows on every click. Bare requests are bounded too: the sales list defaults to the last 30 trading days and the audit trail to a 30-day rolling window (7, 30, 90 or 365).
+
+Everything else returned in full is small by nature: outlets, an outlet's menu and stock (bounded by the master menu), today's kitchen tickets (24 hours, at most 200) and reports (pre-aggregated, at most 366 days). The master menu itself is page-numbered (at most 1,000 pages); the HQ assignment screen loads it 50 at a time with "Load more" and filters "not on this outlet" on the server, and the command palette searches it on the server, so no item is ever out of reach. The POS renders the whole outlet menu without virtualisation, which is right for menus of a few hundred items; a menu of thousands would add list virtualisation to the item grid.
 
 ---
 
