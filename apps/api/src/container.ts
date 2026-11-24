@@ -1,4 +1,5 @@
 import type { Env } from "@/config/env.ts";
+import { createCatalogModule } from "@/modules/catalog";
 import { createIdentityModule } from "@/modules/identity";
 import { createInventoryModule } from "@/modules/inventory";
 import { createOutletsModule } from "@/modules/outlets";
@@ -46,8 +47,9 @@ export function createContainer(env: Env, logger: Logger) {
   });
   const outlets = createOutletsModule({ db, outbox });
   const inventory = createInventoryModule({ db, outbox });
+  const catalog = createCatalogModule({ db, outlets: outlets.api, inventory: inventory.api });
 
-  const modules: ModuleDefinition[] = [identity.module, outlets.module, inventory.module];
+  const modules: ModuleDefinition[] = [identity.module, outlets.module, catalog.module, inventory.module];
 
   return {
     env,
@@ -61,6 +63,7 @@ export function createContainer(env: Env, logger: Logger) {
     api: {
       identity: identity.api,
       outlets: outlets.api,
+      catalog: catalog.api,
       inventory: inventory.api,
     },
     async close(): Promise<void> {
