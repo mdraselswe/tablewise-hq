@@ -109,7 +109,11 @@ describe("pagination of large lists", () => {
     expect(odd.status).toBe(400);
   });
 
-  it("refuses absurd page numbers on page-numbered lists", async () => {
+  it("finds master menu items that are not on an outlet's menu, and refuses absurd page numbers", async () => {
+    const unassigned = await api(app, hqToken).get(`/menu-items?notAssignedTo=${fixture.outletA.id}`);
+    expect(unassigned.body.items.map((item: { sku: string }) => item.sku)).toEqual(["CAKE"]);
+    expect(unassigned.body.total).toBe(1);
+
     const tooDeep = await api(app, hqToken).get("/menu-items?page=1001");
     expect(tooDeep.status).toBe(400);
   });

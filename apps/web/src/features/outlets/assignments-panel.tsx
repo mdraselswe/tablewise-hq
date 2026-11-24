@@ -1,11 +1,11 @@
 import type { MenuItem, OutletAssignment, StockLevel } from "@tablewise/contracts";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn } from "cn";
 import { Plus, Search, UtensilsCrossed } from "lucide-react";
 import { type FormEvent, useDeferredValue, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { keys } from "@/api/keys.ts";
-import { assignmentsQuery, catalogApi, menuItemsQuery, stockLevelsQuery } from "@/api/resources.ts";
+import { assignmentsQuery, catalogApi, menuItemsInfiniteQuery, stockLevelsQuery } from "@/api/resources.ts";
 import { Button } from "@/components/ui/button.tsx";
 import {
   Dialog,
@@ -24,8 +24,13 @@ import { formatMoney, minorToInput, parseMoney } from "@/lib/format.ts";
 
 type View = "assigned" | "unassigned" | "all";
 
+const MASTER_PAGE_SIZE = 50;
+
+/** What the table needs from an item, available both from the master menu and from an assignment. */
+type RowItem = Pick<MenuItem, "id" | "sku" | "name" | "category" | "basePriceMinor">;
+
 interface Row {
-  item: MenuItem;
+  item: RowItem;
   assignment: OutletAssignment | undefined;
   stock: StockLevel | undefined;
 }
@@ -125,7 +130,7 @@ function AssignDialog({
   onAssign,
   pending,
 }: {
-  item: MenuItem | null;
+  item: RowItem | null;
   onClose: () => void;
   onAssign: (body: { openingStock: number; priceOverrideMinor?: number }) => void;
   pending: boolean;
@@ -241,35 +246,57 @@ function RemoveDialog({
  * whether each is on sale right now.
  */
 export function AssignmentsPanel({ outletId }: { outletId: string }) {
-  // The master menu is small (tens of items); the API's page limit is 100. Search narrows it beyond that.
   const [search, setSearch] = useState("");
   const deferredSearch = useDeferredValue(search.trim());
-  const items = useQuery(
-    menuItemsQuery({
-      ...(deferredSearch ? { search: deferredSearch } : {}),
-      status: "active",
-      pageSize: 100,
-    }),
-  );
+  const [view, setView] = useState<View>("assigned");
+  // "On menu" comes from the outlet's assignments, which are complete. The other views
+  // page through the master menu on the server ("Load more"), with search and the
+  // "not on this menu" filter applied there, so no item is ever out of reach.
   const assignments = useQuery(assignmentsQuery(outletId));
   const stock = useQuery(stockLevelsQuery(outletId));
-  const [view, setView] = useState<View>("assigned");
-  const [assigning, setAssigning] = useState<MenuItem | null>(null);
+  const master = useInfiniteQuery({
+    ...menuItemsInfiniteQuery({
+      ...(deferredSearch ? { search: deferredSearch } : {}),
+      ...(view === "unassigned" ? { notAssignedTo: outletId } : {}),
+      status: "active",
+      pageSize: MASTER_PAGE_SIZE,
+    }),
+    enabled: view !== "assigned",
+  });
+  const [assigning, setAssigning] = useState<RowItem | null>(null);
   const [removing, setRemoving] = useState<Row | null>(null);
   const { upsert, remove } = useAssignmentMutations(outletId);
 
   const rows = useMemo<Row[]>(() => {
     const byItem = new Map((assignments.data ?? []).map((assignment) => [assignment.menuItemId, assignment]));
     const stockByItem = new Map((stock.data ?? []).map((level) => [level.menuItemId, level]));
-    return (items.data?.items ?? [])
+    if (view === "assigned") {
+      const needle = deferredSearch.toLowerCase();
+      return (assignments.data ?? [])
+        .filter((a) => !needle || `${a.name} ${a.sku}`.toLowerCase().includes(needle))
+        .map((a) => ({
+          item: {
+            id: a.menuItemId,
+            sku: a.sku,
+            name: a.name,
+            category: a.category,
+            basePriceMinor: a.basePriceMinor,
+          },
+          assignment: a,
+          stock: stockByItem.get(a.menuItemId),
+        }))
+        .sort(
+          (x, y) => x.item.category.localeCompare(y.item.category) || x.item.name.localeCompare(y.item.name),
+        );
+    }
+    // Server order (category, name) is kept so "Load more" only appends.
+    return (master.data?.pages ?? [])
+      .flatMap((page) => page.items)
       .map((item) => ({ item, assignment: byItem.get(item.id), stock: stockByItem.get(item.id) }))
-      .filter((row) =>
-        view === "assigned" ? row.assignment : view === "unassigned" ? !row.assignment : true,
-      )
-      .sort(
-        (a, b) => a.item.category.localeCompare(b.item.category) || a.item.name.localeCompare(b.item.name),
-      );
-  }, [items.data, assignments.data, stock.data, view]);
+      .filter((row) => view === "all" || !row.assignment);
+  }, [master.data, assignments.data, stock.data, view, deferredSearch]);
+  const masterTotal = master.data?.pages[0]?.total ?? 0;
+  const loading = view === "assigned" ? assignments.isPending : master.isPending || assignments.isPending;
 
   const assignedCount = assignments.data?.length ?? 0;
   const overrideCount = (assignments.data ?? []).filter(
@@ -307,7 +334,7 @@ export function AssignmentsPanel({ outletId }: { outletId: string }) {
           </div>
         }
       />
-      {items.isPending || assignments.isPending ? (
+      {loading ? (
         <div className="grid gap-2 px-5 pb-5">
           {Array.from({ length: 8 }, (_, index) => (
             <Skeleton key={index} className="h-11" />
@@ -393,6 +420,24 @@ export function AssignmentsPanel({ outletId }: { outletId: string }) {
           </TBody>
         </Table>
       )}
+      {view !== "assigned" && !loading && rows.length > 0 ? (
+        <footer className="flex flex-wrap items-center justify-between gap-3 border-t px-5 py-3 text-xs text-muted-foreground">
+          <span className="num">
+            Showing {rows.length} of {masterTotal}{" "}
+            {view === "unassigned" ? "items not on this menu" : "items"}
+          </span>
+          {master.hasNextPage ? (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={master.isFetchingNextPage}
+              onClick={() => void master.fetchNextPage()}
+            >
+              {master.isFetchingNextPage ? "Loading…" : "Load more"}
+            </Button>
+          ) : null}
+        </footer>
+      ) : null}
       <AssignDialog
         item={assigning}
         pending={upsert.isPending}

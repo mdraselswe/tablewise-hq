@@ -1,4 +1,4 @@
-import { queryOptions } from "@tanstack/react-query";
+import { infiniteQueryOptions, queryOptions } from "@tanstack/react-query";
 import type {
   AdjustStockRequest,
   CreateMenuItemRequest,
@@ -86,6 +86,17 @@ export const menuItemsQuery = (filter: MenuItemsFilter) =>
   queryOptions({
     queryKey: keys.catalog.items(filter),
     queryFn: ({ signal }) => http.get<Paginated<MenuItem>>("/menu-items", { ...filter }, signal),
+    placeholderData: (previous) => previous,
+  });
+
+/** The master menu one page at a time, for lists that offer "Load more" instead of page numbers. */
+export const menuItemsInfiniteQuery = (filter: Omit<MenuItemsFilter, "page"> & { notAssignedTo?: string }) =>
+  infiniteQueryOptions({
+    queryKey: [...keys.catalog.items(filter), "infinite"] as const,
+    queryFn: ({ pageParam, signal }) =>
+      http.get<Paginated<MenuItem>>("/menu-items", { ...filter, page: pageParam }, signal),
+    initialPageParam: 1,
+    getNextPageParam: (last) => (last.page * last.pageSize < last.total ? last.page + 1 : undefined),
     placeholderData: (previous) => previous,
   });
 

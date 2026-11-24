@@ -12,7 +12,7 @@ import {
   Sun,
   UtensilsCrossed,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { menuItemsQuery, outletsQuery } from "@/api/resources.ts";
 import { navFor } from "@/app/navigation.ts";
@@ -61,7 +61,12 @@ export function CommandPalette() {
   }, []);
 
   const outlets = useQuery({ ...outletsQuery, enabled: open && hq });
-  const items = useQuery({ ...menuItemsQuery({ pageSize: 100, status: "all" }), enabled: open && hq });
+  // Menu items are searched on the server, so every item is reachable however large the menu grows.
+  const itemSearch = useDeferredValue(query.trim());
+  const items = useQuery({
+    ...menuItemsQuery({ search: itemSearch, pageSize: 20, status: "all" }),
+    enabled: open && hq && itemSearch.length > 0,
+  });
 
   const commands = useMemo<Command[]>(() => {
     const go = (to: string) => () => void navigate(to);

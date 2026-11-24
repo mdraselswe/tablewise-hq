@@ -116,14 +116,22 @@ export class CatalogRepository {
     const filters = `
       WHERE ($1::text IS NULL OR (mi.name || ' ' || mi.sku) ILIKE $1)
         AND ($2::text IS NULL OR mi.category = $2)
-        AND ($3::text = 'all' OR mi.is_active = ($3::text = 'active'))`;
-    const params = [query.search ? likePattern(query.search) : null, query.category ?? null, query.status];
+        AND ($3::text = 'all' OR mi.is_active = ($3::text = 'active'))
+        AND ($4::uuid IS NULL OR NOT EXISTS (
+              SELECT 1 FROM catalog.outlet_menu_items omi
+               WHERE omi.outlet_id = $4 AND omi.menu_item_id = mi.id))`;
+    const params = [
+      query.search ? likePattern(query.search) : null,
+      query.category ?? null,
+      query.status,
+      query.notAssignedTo ?? null,
+    ];
     const { limit, offset } = pageWindow(query.page, query.pageSize);
 
     const [rows, count] = await Promise.all([
       this.db.many<MenuItemRow>(
         `SELECT ${MENU_ITEM_COLUMNS} FROM catalog.menu_items mi ${filters}
-          ORDER BY mi.category, mi.name LIMIT $4 OFFSET $5`,
+          ORDER BY mi.category, mi.name, mi.id LIMIT $5 OFFSET $6`,
         [...params, limit, offset],
       ),
       this.db.one<{ total: number }>(

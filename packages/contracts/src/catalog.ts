@@ -34,6 +34,7 @@ export const ListMenuItemsQuery = PaginationQuery.extend({
   search: z.string().trim().max(120).optional(),
   category: z.string().trim().max(60).optional(),
   status: MenuItemStatusFilter.default("all"),
+  notAssignedTo: Id.optional().meta({ description: "Only items that are not on this outlet's menu." }),
 });
 export type ListMenuItemsQuery = z.output<typeof ListMenuItemsQuery>;
 
