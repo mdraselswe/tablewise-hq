@@ -3,6 +3,7 @@ import { loadEnv } from "@/config/env.ts";
 import { createContainer } from "@/container.ts";
 import { migrate } from "@/platform/db/migrator.ts";
 import { createLogger } from "@/platform/logger.ts";
+import { seedDemoData } from "@/seed/demo-data.ts";
 
 async function main(): Promise<void> {
   const env = loadEnv();
@@ -17,6 +18,11 @@ async function main(): Promise<void> {
   const server = createApp(container).listen(env.PORT, () => {
     logger.info({ port: env.PORT, env: env.NODE_ENV }, "Tablewise API listening");
   });
+
+  if (env.SEED_DEMO_DATA) {
+    // Runs after the server is up so health checks pass while a fresh database is seeded.
+    seedDemoData(container).catch((error: unknown) => logger.error({ err: error }, "demo seed failed"));
+  }
 
   let shuttingDown = false;
   const shutdown = (signal: string): void => {
