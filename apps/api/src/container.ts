@@ -2,6 +2,7 @@ import type { Env } from "@/config/env.ts";
 import { createCatalogModule } from "@/modules/catalog";
 import { createIdentityModule } from "@/modules/identity";
 import { createInventoryModule } from "@/modules/inventory";
+import { createKitchenModule } from "@/modules/kitchen";
 import { createOutletsModule } from "@/modules/outlets";
 import { createSalesModule } from "@/modules/sales";
 import { TokenService } from "@/platform/auth/token-service.ts";
@@ -56,6 +57,7 @@ export function createContainer(env: Env, logger: Logger) {
     catalog: catalog.api,
     inventory: inventory.api,
   });
+  const kitchen = createKitchenModule({ db, outbox, bus });
 
   const modules: ModuleDefinition[] = [
     identity.module,
@@ -63,6 +65,7 @@ export function createContainer(env: Env, logger: Logger) {
     catalog.module,
     inventory.module,
     sales.module,
+    kitchen.module,
   ];
 
   return {
