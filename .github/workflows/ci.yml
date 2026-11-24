@@ -35,8 +35,8 @@ jobs:
       TEST_DATABASE_URL: postgres://tablewise:tablewise@localhost:5432/tablewise_test
       HUSKY: "0"
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           # pnpm only exists after `corepack enable`; the store is cached below instead.
@@ -45,7 +45,7 @@ jobs:
       - name: Locate the pnpm store
         run: echo "PNPM_STORE=$(pnpm store path --silent)" >> "$GITHUB_ENV"
       - name: Cache the pnpm store
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ env.PNPM_STORE }}
           key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
@@ -62,9 +62,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v5
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/build-push-action@v6
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/build-push-action@v7
         with:
           context: .
           push: false

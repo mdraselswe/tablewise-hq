@@ -8,11 +8,22 @@ updates:
       # One PR for routine minor and patch updates instead of dozens.
       minor-and-patch:
         update-types: [minor, patch]
+    ignore:
+      # Types must match the Node.js runtime (24 LTS, see .nvmrc); move them with the runtime.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
   - package-ecosystem: docker
     directory: /
     schedule:
       interval: weekly
+    ignore:
+      # The base image follows the Node.js LTS line in .nvmrc; majors move together with it.
+      - dependency-name: node
+        update-types: ["version-update:semver-major"]
