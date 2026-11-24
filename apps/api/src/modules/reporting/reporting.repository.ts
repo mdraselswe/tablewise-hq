@@ -123,7 +123,7 @@ export class ReportingRepository {
        ), ranked AS (
          SELECT totals.*,
                 ROW_NUMBER() OVER (PARTITION BY outlet_id
-                                   ORDER BY quantity DESC, revenue_minor DESC, item_name) AS rank
+                                   ORDER BY quantity DESC, revenue_minor DESC, item_name, menu_item_id) AS rank
            FROM totals
        )
        SELECT d.outlet_id, d.code, d.name,

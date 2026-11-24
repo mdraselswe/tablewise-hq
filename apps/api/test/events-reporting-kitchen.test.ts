@@ -79,6 +79,26 @@ describe("outbox events, reporting projections and the kitchen board", () => {
     expect(scoped.body.outlets).toHaveLength(1);
   });
 
+  it("breaks full ties in the top-N ranking by item id, so the order never changes between calls", async () => {
+    const twin = async (sku: string) => {
+      const item = await container.api.catalog.createMenuItem({
+        sku,
+        name: "Twin Muffin",
+        category: "Bakery",
+        basePriceMinor: 10_000,
+      });
+      await container.api.catalog.assign(fixture.outletA.id, item.id, { openingStock: 10 }, fixture.hq);
+      return item.id;
+    };
+    const ids = [await twin("TWIN-1"), await twin("TWIN-2")];
+    await sell(ids.map((menuItemId) => ({ menuItemId, quantity: 1 })));
+    await container.relay.drain();
+
+    const top = await api(app, hqToken).get(`/reports/top-items?outletId=${fixture.outletA.id}`);
+    const twins = top.body.outlets[0].items.filter((item: { sku: string }) => item.sku.startsWith("TWIN"));
+    expect(twins.map((item: { menuItemId: string }) => item.menuItemId)).toEqual([...ids].sort());
+  });
+
   it("projects each event once even if it is delivered again", async () => {
     await sell([{ menuItemId: fixture.items.latte, quantity: 1 }]);
     await container.relay.drain();
