@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { RequestHandler } from "express";
+import type { SessionValidator } from "@/platform/auth/actor.ts";
 import type { TokenService } from "@/platform/auth/token-service.ts";
 
 export const SESSION_COOKIE = "tw_session";
@@ -18,15 +19,19 @@ export const requestId: RequestHandler = (req, res, next) => {
  * Resolves the actor from the session cookie (browsers) or a Bearer token (API
  * clients, other services). It never rejects: routes decide whether a session is
  * required, so public routes and invalid tokens both just see `actor = null`.
+ *
+ * A valid signature is not enough: the user must still be active with the same role
+ * and outlet (one primary-key lookup), so revoking access takes effect at once.
  */
-export function authenticate(tokens: TokenService): RequestHandler {
+export function authenticate(tokens: TokenService, sessions: SessionValidator): RequestHandler {
   return async (req, _res, next) => {
     req.actor = null;
     const header = req.header("authorization");
     const bearer = header?.startsWith("Bearer ") ? header.slice(7).trim() : undefined;
     const cookie = (req.cookies as Record<string, string | undefined> | undefined)?.[SESSION_COOKIE];
     const token = bearer ?? cookie;
-    if (token) req.actor = await tokens.verify(token);
+    const actor = token ? await tokens.verify(token) : null;
+    req.actor = actor && (await sessions.isCurrent(actor)) ? actor : null;
     next();
   };
 }

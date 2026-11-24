@@ -10,6 +10,16 @@ export interface Actor {
   outletId: string | null;
 }
 
+/**
+ * Confirms that a verified token still matches the user as stored now. A token is
+ * a snapshot taken at sign-in; without this check a deactivated user, or a cashier
+ * moved to another outlet, would keep their old powers until the token expired.
+ * Implemented by the identity module and wired in the container.
+ */
+export interface SessionValidator {
+  isCurrent(actor: Actor): Promise<boolean>;
+}
+
 export function isHq(actor: Actor): boolean {
   return actor.role === "HQ_ADMIN";
 }

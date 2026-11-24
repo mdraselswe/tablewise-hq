@@ -18,6 +18,36 @@ describe("authentication, authorization and validation", () => {
 
   afterAll(() => context.close());
 
+  it("ends the session at once when a user is deactivated or moved to another outlet", async () => {
+    const make = (email: string) =>
+      container.api.identity.createUser({
+        email,
+        fullName: "Temp Cashier",
+        password: "password-123",
+        role: "OUTLET_STAFF",
+        outletId: fixture.outletA.id,
+      });
+    const leaver = await make("leaver@test.local");
+    const mover = await make("mover@test.local");
+    const leaverToken = await fixture.token(leaver);
+    const moverToken = await fixture.token(mover);
+    expect((await api(app, leaverToken).get("/auth/me")).status).toBe(200);
+
+    await container.db.query("UPDATE identity.users SET is_active = false WHERE id = $1", [leaver.id]);
+    await container.db.query("UPDATE identity.users SET outlet_id = $2 WHERE id = $1", [
+      mover.id,
+      fixture.outletB.id,
+    ]);
+
+    // Both tokens are still validly signed and unexpired, yet neither works any more.
+    expect((await api(app, leaverToken).get("/auth/me")).status).toBe(401);
+    const sale = await api(app, moverToken).post(`/outlets/${fixture.outletA.id}/sales`, {
+      lines: [{ menuItemId: fixture.items.latte, quantity: 1 }],
+      paymentMethod: "CASH",
+    });
+    expect(sale.status).toBe(401);
+  });
+
   it("signs in with a cookie and a token, and rejects wrong passwords with one generic message", async () => {
     const login = await request(app)
       .post("/api/v1/auth/login")

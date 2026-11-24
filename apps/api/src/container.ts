@@ -6,6 +6,7 @@ import { createKitchenModule } from "@/modules/kitchen";
 import { createOutletsModule } from "@/modules/outlets";
 import { createReportingModule } from "@/modules/reporting";
 import { createSalesModule } from "@/modules/sales";
+import type { SessionValidator } from "@/platform/auth/actor.ts";
 import { TokenService } from "@/platform/auth/token-service.ts";
 import { Database } from "@/platform/db/database.ts";
 import { EventBus } from "@/platform/events/event-bus.ts";
@@ -77,6 +78,7 @@ export function createContainer(env: Env, logger: Logger) {
     logger,
     db,
     tokens,
+    sessions: { isCurrent: (actor) => identity.api.isSessionCurrent(actor) } satisfies SessionValidator,
     bus,
     relay,
     realtime,

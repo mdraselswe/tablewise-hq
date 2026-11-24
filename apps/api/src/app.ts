@@ -46,7 +46,7 @@ export function createApp(container: Container): Express {
   );
   app.use(express.json({ limit: "100kb" }));
   app.use(cookieParser());
-  app.use(authenticate(container.tokens));
+  app.use(authenticate(container.tokens, container.sessions));
 
   // ---- Health (for load balancers and orchestrators) ----
   app.get("/health/live", (_req, res) => {

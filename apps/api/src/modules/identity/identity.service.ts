@@ -39,6 +39,14 @@ export class IdentityService {
     return toSessionUser(user);
   }
 
+  /** True while the user behind a token is still active with the token's role and outlet. */
+  async isSessionCurrent(actor: Actor): Promise<boolean> {
+    const user = await this.repository.findById(actor.id);
+    return (
+      user !== undefined && user.isActive && user.role === actor.role && user.outletId === actor.outletId
+    );
+  }
+
   /** Used by the seeder and future user-management screens. */
   async createUser(input: {
     email: string;

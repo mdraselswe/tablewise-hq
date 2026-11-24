@@ -6,7 +6,7 @@ import { IdentityRepository } from "./identity.repository.ts";
 import { identityRoutes } from "./identity.routes.ts";
 import { IdentityService } from "./identity.service.ts";
 
-export type IdentityApi = Pick<IdentityService, "createUser">;
+export type IdentityApi = Pick<IdentityService, "createUser" | "isSessionCurrent">;
 
 export function createIdentityModule(deps: {
   db: Database;
