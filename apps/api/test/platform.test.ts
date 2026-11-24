@@ -2,8 +2,9 @@ import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import request from "supertest";
-import { afterAll, describe, expect, it } from "vitest";
-import { createTestContext } from "./helpers.ts";
+import { afterAll, describe, expect, it, vi } from "vitest";
+import { Database } from "@/platform/db/database.ts";
+import { createTestContext, TEST_DATABASE_URL } from "./helpers.ts";
 
 describe("single-container web app", () => {
   const dist = mkdtempSync(path.join(tmpdir(), "tablewise-web-"));
@@ -33,5 +34,28 @@ describe("single-container web app", () => {
     const miss = await request(context.app).get("/api/v1/nope");
     expect(miss.status).toBe(404);
     expect(miss.body.error.code).toBe("NOT_FOUND");
+  });
+});
+
+describe("Database.transaction", () => {
+  it("returns the committed result even when an after-commit callback throws", async () => {
+    const onCallbackError = vi.fn();
+    const db = Database.connect({ connectionString: TEST_DATABASE_URL, ssl: false, max: 1, onCallbackError });
+    const later = vi.fn();
+    try {
+      const result = await db.transaction(async () => {
+        db.afterCommit(() => {
+          throw new Error("listener failed");
+        });
+        db.afterCommit(later);
+        return (await db.one<{ value: number }>("SELECT 42 AS value"))?.value;
+      });
+
+      expect(result).toBe(42);
+      expect(onCallbackError).toHaveBeenCalledWith(expect.objectContaining({ message: "listener failed" }));
+      expect(later).toHaveBeenCalledOnce();
+    } finally {
+      await db.close();
+    }
   });
 });

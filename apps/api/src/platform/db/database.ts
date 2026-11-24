@@ -17,7 +17,13 @@ export interface DatabaseOptions {
   ssl: boolean;
   max: number;
   applicationName?: string;
+  /** Receives errors thrown by after-commit callbacks (the transaction is already committed). */
+  onCallbackError?: (error: unknown) => void;
 }
+
+const warnCallbackError = (error: unknown): void => {
+  process.emitWarning(error instanceof Error ? error : String(error), "AfterCommitCallbackError");
+};
 
 /**
  * Thin wrapper around a pg Pool that makes transactions ambient.
@@ -31,7 +37,14 @@ export interface DatabaseOptions {
 export class Database {
   readonly #storage = new AsyncLocalStorage<TransactionContext>();
 
-  constructor(readonly pool: pg.Pool) {}
+  readonly #onCallbackError: (error: unknown) => void;
+
+  constructor(
+    readonly pool: pg.Pool,
+    onCallbackError: (error: unknown) => void = warnCallbackError,
+  ) {
+    this.#onCallbackError = onCallbackError;
+  }
 
   static connect(options: DatabaseOptions): Database {
     const pool = new pg.Pool({
@@ -42,7 +55,7 @@ export class Database {
       connectionTimeoutMillis: 10_000,
       ...(options.ssl ? { ssl: { rejectUnauthorized: false } } : {}),
     });
-    return new Database(pool);
+    return new Database(pool, options.onCallbackError);
   }
 
   get inTransaction(): boolean {
@@ -74,18 +87,21 @@ export class Database {
 
     const client = await this.pool.connect();
     const context: TransactionContext = { client, afterCommit: [], savepoints: 0 };
+    let result: T;
     try {
       await client.query("BEGIN");
-      const result = await this.#storage.run(context, work);
+      result = await this.#storage.run(context, work);
       await client.query("COMMIT");
-      for (const callback of context.afterCommit) callback();
-      return result;
     } catch (error) {
       await client.query("ROLLBACK").catch(() => undefined);
       throw error;
     } finally {
       client.release();
     }
+    // Outside the try: the work is committed, so a failing callback must not turn
+    // the result into an error (a caller would report a saved sale as failed).
+    for (const callback of context.afterCommit) this.#runCallback(callback);
+    return result;
   }
 
   /**
@@ -112,7 +128,15 @@ export class Database {
   afterCommit(callback: () => void): void {
     const context = this.#storage.getStore();
     if (context) context.afterCommit.push(callback);
-    else callback();
+    else this.#runCallback(callback);
+  }
+
+  #runCallback(callback: () => void): void {
+    try {
+      callback();
+    } catch (error) {
+      this.#onCallbackError(error);
+    }
   }
 
   async ping(): Promise<void> {

@@ -28,6 +28,7 @@ export function createContainer(env: Env, logger: Logger) {
     connectionString: env.DATABASE_URL,
     ssl: env.DATABASE_SSL,
     max: env.DATABASE_POOL_MAX,
+    onCallbackError: (error) => logger.error({ err: error }, "after-commit callback failed"),
   });
   const tokens = new TokenService(env.JWT_SECRET, env.SESSION_TTL_MINUTES);
   const bus = new EventBus(db);
