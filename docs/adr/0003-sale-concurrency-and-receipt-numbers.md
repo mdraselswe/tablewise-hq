@@ -12,7 +12,7 @@ The brief requires that a sale deducts outlet stock without ever going negative,
 Inside one `READ COMMITTED` transaction:
 
 1. Merge repeated items and sort lines by `menu_item_id`.
-2. If an `Idempotency-Key` is present, take `pg_advisory_xact_lock` on `(outlet, key)` and return the existing sale if one is found.
+2. If an `Idempotency-Key` is present, take `pg_advisory_xact_lock` on `(outlet, key)` and return the existing sale if one is found. The sale stores a SHA-256 fingerprint of its normalised request; a different request under the same key fails with `IDEMPOTENCY_KEY_REUSED` rather than replaying the wrong sale. This runs before the `occurredAt` window check so late retries of accepted offline sales still replay.
 3. Price lines from the catalog (assigned, available, active items only).
 4. Lock the outlet's stock rows with `SELECT ... FOR UPDATE ORDER BY menu_item_id`, check every line, report all shortfalls at once, then deduct in one statement and write audit rows.
 5. Take the next receipt number last: `INSERT INTO sales.receipt_sequences ... ON CONFLICT (outlet_id) DO UPDATE SET last_value = last_value + 1 RETURNING last_value`.
