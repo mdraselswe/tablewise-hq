@@ -1,5 +1,5 @@
 import type { SessionUser } from "@tablewise/contracts";
-import { LayoutDashboard, type LucideIcon, UtensilsCrossed } from "lucide-react";
+import { Boxes, LayoutDashboard, type LucideIcon, UtensilsCrossed } from "lucide-react";
 
 export interface NavItem {
   to: string;
@@ -13,6 +13,6 @@ export const HQ_NAV: NavItem[] = [
   { to: "/hq/menu", label: "Master menu", icon: UtensilsCrossed },
 ];
 
-export const OUTLET_NAV: NavItem[] = [];
+export const OUTLET_NAV: NavItem[] = [{ to: "/outlet/inventory", label: "Inventory", icon: Boxes }];
 
 export const navFor = (user: SessionUser) => (user.role === "HQ_ADMIN" ? HQ_NAV : OUTLET_NAV);

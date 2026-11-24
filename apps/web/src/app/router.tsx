@@ -38,7 +38,9 @@ export const router = createBrowserRouter([
               {
                 path: "outlet",
                 element: <RequireRole role="OUTLET_STAFF" />,
-                children: [],
+                children: [
+                  { path: "inventory", lazy: page(() => import("@/features/inventory/inventory-page.tsx")) },
+                ],
               },
               { path: "*", element: <NotFoundPage /> },
             ],
