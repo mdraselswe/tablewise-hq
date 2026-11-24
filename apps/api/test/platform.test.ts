@@ -31,6 +31,11 @@ describe("single-container web app", () => {
     const asset = await request(context.app).get("/assets/app-abc123.js");
     expect(asset.headers["cache-control"]).toContain("immutable");
 
+    // A chunk from an older deploy is a plain 404, never the HTML shell.
+    const stale = await request(context.app).get("/assets/app-old999.js");
+    expect(stale.status).toBe(404);
+    expect(stale.headers["content-type"] ?? "").not.toMatch(/text\/html/);
+
     const miss = await request(context.app).get("/api/v1/nope");
     expect(miss.status).toBe(404);
     expect(miss.body.error.code).toBe("NOT_FOUND");

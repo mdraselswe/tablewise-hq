@@ -101,6 +101,9 @@ export function createApp(container: Container): Express {
     app.use((req, res, next) => {
       const read = req.method === "GET" || req.method === "HEAD";
       if (!read || req.path.startsWith("/health")) return next();
+      // A missing build file is a 404, not the app shell: HTML served as JavaScript
+      // breaks the page with a MIME error instead of a clear failed request.
+      if (req.path.startsWith("/assets/")) return void res.sendStatus(404);
       res.setHeader("Cache-Control", "no-cache");
       res.sendFile(path.join(root, "index.html"));
     });
