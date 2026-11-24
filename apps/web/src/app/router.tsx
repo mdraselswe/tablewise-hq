@@ -32,6 +32,11 @@ export const router = createBrowserRouter([
                 element: <RequireRole role="HQ_ADMIN" />,
                 children: [
                   { index: true, lazy: page(() => import("@/features/dashboard/dashboard-page.tsx")) },
+                  { path: "outlets", lazy: page(() => import("@/features/outlets/outlets-page.tsx")) },
+                  {
+                    path: "outlets/:outletId",
+                    lazy: page(() => import("@/features/outlets/outlet-detail-page.tsx")),
+                  },
                   { path: "menu", lazy: page(() => import("@/features/menu/menu-page.tsx")) },
                 ],
               },

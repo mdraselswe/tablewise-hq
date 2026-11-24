@@ -1,5 +1,5 @@
 import type { SessionUser } from "@tablewise/contracts";
-import { Boxes, LayoutDashboard, type LucideIcon, UtensilsCrossed } from "lucide-react";
+import { Boxes, LayoutDashboard, type LucideIcon, Store, UtensilsCrossed } from "lucide-react";
 
 export interface NavItem {
   to: string;
@@ -10,6 +10,7 @@ export interface NavItem {
 
 export const HQ_NAV: NavItem[] = [
   { to: "/hq", label: "Overview", icon: LayoutDashboard, end: true },
+  { to: "/hq/outlets", label: "Outlets", icon: Store },
   { to: "/hq/menu", label: "Master menu", icon: UtensilsCrossed },
 ];
 
