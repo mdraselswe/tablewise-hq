@@ -4,6 +4,7 @@ import { createIdentityModule } from "@/modules/identity";
 import { createInventoryModule } from "@/modules/inventory";
 import { createKitchenModule } from "@/modules/kitchen";
 import { createOutletsModule } from "@/modules/outlets";
+import { createReportingModule } from "@/modules/reporting";
 import { createSalesModule } from "@/modules/sales";
 import { TokenService } from "@/platform/auth/token-service.ts";
 import { Database } from "@/platform/db/database.ts";
@@ -58,6 +59,7 @@ export function createContainer(env: Env, logger: Logger) {
     inventory: inventory.api,
   });
   const kitchen = createKitchenModule({ db, outbox, bus });
+  const reporting = createReportingModule({ db, bus, businessTimeZone: env.BUSINESS_TIMEZONE });
 
   const modules: ModuleDefinition[] = [
     identity.module,
@@ -66,6 +68,7 @@ export function createContainer(env: Env, logger: Logger) {
     inventory.module,
     sales.module,
     kitchen.module,
+    reporting.module,
   ];
 
   return {
