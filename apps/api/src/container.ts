@@ -1,5 +1,6 @@
 import type { Env } from "@/config/env.ts";
 import { createIdentityModule } from "@/modules/identity";
+import { createInventoryModule } from "@/modules/inventory";
 import { createOutletsModule } from "@/modules/outlets";
 import { TokenService } from "@/platform/auth/token-service.ts";
 import { Database } from "@/platform/db/database.ts";
@@ -44,8 +45,9 @@ export function createContainer(env: Env, logger: Logger) {
     rateLimitLogin: env.NODE_ENV !== "test",
   });
   const outlets = createOutletsModule({ db, outbox });
+  const inventory = createInventoryModule({ db, outbox });
 
-  const modules: ModuleDefinition[] = [identity.module, outlets.module];
+  const modules: ModuleDefinition[] = [identity.module, outlets.module, inventory.module];
 
   return {
     env,
@@ -59,6 +61,7 @@ export function createContainer(env: Env, logger: Logger) {
     api: {
       identity: identity.api,
       outlets: outlets.api,
+      inventory: inventory.api,
     },
     async close(): Promise<void> {
       await relay.stop();
