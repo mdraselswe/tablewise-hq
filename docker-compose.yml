@@ -1,0 +1,41 @@
+# Local stack.
+#   docker compose up -d db          -> PostgreSQL only (for `pnpm dev`)
+#   docker compose up --build        -> PostgreSQL + the production image on http://localhost:8080
+name: tablewise
+
+services:
+  db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: tablewise
+      POSTGRES_PASSWORD: tablewise
+      POSTGRES_DB: tablewise
+    ports:
+      - "5433:5432"
+    volumes:
+      - db-data:/var/lib/postgresql
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tablewise -d tablewise"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  app:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      DATABASE_URL: postgres://tablewise:tablewise@db:5432/tablewise
+      JWT_SECRET: local-compose-secret-change-me-0123456789abcdef
+      SEED_DEMO_DATA: "true"
+      # Plain HTTP on localhost: allow the session cookie without HTTPS.
+      COOKIE_SECURE: "false"
+    ports:
+      - "8080:4000"
+
+volumes:
+  db-data:
