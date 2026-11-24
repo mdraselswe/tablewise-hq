@@ -12,7 +12,7 @@ The brief asks for a Dockerfile, docker-compose and a deployed instance. Reviewe
 - Build one image with a multi-stage Dockerfile: install with pnpm, build the web app (Vite) and the API (esbuild bundle), then copy only production dependencies, the bundle, the migrations and the web build into a slim Node.js runtime image.
 - The API serves the built web app from `WEB_DIST_DIR` on the same origin (fingerprinted assets with long-lived immutable caching, `index.html` for client-side routes).
 - On boot the process applies migrations (advisory-locked, so safe with several instances) and, when `SEED_DEMO_DATA` is set and the database is empty, seeds the demo data in the background.
-- Deploy the image on Render as a web service with Render's managed PostgreSQL. `docker-compose.yml` runs the same image locally with PostgreSQL 18.
+- Deploy the image on Render as a web service; the database is Neon serverless PostgreSQL, reached over TLS with its direct (non-pooled) connection string because the app holds a `LISTEN` connection. `docker-compose.yml` runs the same image locally with PostgreSQL 18.
 
 ## Alternatives considered
 
@@ -24,5 +24,6 @@ The brief asks for a Dockerfile, docker-compose and a deployed instance. Reviewe
 
 - One URL, one origin, no CORS, simple cookies.
 - Identical image locally (`docker compose up --build`) and in production.
-- Render's free PostgreSQL instance expires after 30 days; a paid instance or another managed PostgreSQL is needed for anything longer-lived. The app needs only a `DATABASE_URL` to move.
+- Render's free PostgreSQL expires after 30 days, which is why the database is on Neon. The app needs only a `DATABASE_URL` to move to any other PostgreSQL.
+- The free Render service sleeps when idle, so the first request after a pause is slow; a paid instance removes that.
 - When the web app moves to a CDN later, the API keeps working unchanged; only `WEB_DIST_DIR` is unset.

@@ -83,7 +83,7 @@ A multi-outlet food and beverage platform. HQ owns the master menu, decides whic
 | Monorepo            | pnpm workspaces                                   | API, web and contracts in one repo with one lockfile; strict dependency isolation; exact versions and a one-day minimum release age as supply-chain safety.                                                                            |
 | Quality gates       | ESLint, Prettier, Husky, lint-staged, commitlint  | Formatting and lint on every commit, Conventional Commits enforced, module boundaries enforced by lint rules.                                                                                                                          |
 | Packaging           | Docker (multi-stage) + docker-compose             | Same image locally and in production; compose brings up PostgreSQL plus the app with one command.                                                                                                                                      |
-| Hosting             | Render (web service + managed PostgreSQL)         | Deploys the Docker image from GitHub, provides TLS and managed Postgres with no servers to run. A single container serves both the API and the built web app.                                                                          |
+| Hosting             | Render (Docker web service) + Neon (PostgreSQL)   | Render deploys the Docker image from GitHub and provides TLS; Neon is managed serverless PostgreSQL that does not expire on the free plan. No servers to run. A single container serves both the API and the built web app.            |
 
 ---
 
@@ -414,13 +414,13 @@ In production the API serves the built app from the same origin, so the session 
 
 The repository deploys as **one Docker image** that runs the API and serves the web app.
 
-**Render (hosted demo).** [`render.yaml`](render.yaml) is a Blueprint for a Docker web service plus a managed PostgreSQL database:
+**Hosted demo: Render + Neon.** The container runs on Render; the database is [Neon](https://neon.tech) serverless PostgreSQL, which (unlike Render's free PostgreSQL) does not expire after 30 days.
 
-1. Render dashboard -> **New** -> **Blueprint** -> select this repository.
-2. Render creates the database, generates `JWT_SECRET`, builds the image and starts it. The health check is `/health/ready`.
+1. Create a Neon project and copy its **direct** connection string (host without `-pooler`). The app keeps a `LISTEN` connection open for live updates, which a transaction-mode pooler would break.
+2. Render dashboard -> **New** -> **Blueprint** -> select this repository. [`render.yaml`](render.yaml) defines the Docker web service; Render asks for `DATABASE_URL`, generates `JWT_SECRET`, builds the image and starts it. The health check is `/health/ready`.
 3. On first boot the app applies migrations and, because `SEED_DEMO_DATA=true`, fills the empty database with demo data.
 
-The free plan sleeps after 15 minutes without traffic (the next request then waits for the container to start) and free databases expire after 30 days. For a longer-lived demo, set `DATABASE_URL` to a Neon or Supabase database and `DATABASE_SSL=true`.
+Render's free plan sleeps after 15 minutes without traffic; the next request waits while the container starts. Neon suspends its compute when idle and wakes on the next connection, and the realtime listener reconnects by itself.
 
 **Any container host.** Build with `docker build -t tablewise .` and provide `DATABASE_URL` and `JWT_SECRET` (plus `TRUST_PROXY=true` behind a TLS-terminating proxy). The image runs as a non-root user, has a container health check, and applies pending migrations on start under an advisory lock, so several instances can start at once.
 
@@ -467,5 +467,5 @@ tablewise-hq/
   .github/                  CI workflow and Dependabot
   docker-compose.yml
   Dockerfile                multi-stage production image (API + web)
-  render.yaml               Render Blueprint (web service + PostgreSQL)
+  render.yaml               Render Blueprint (Docker web service; database on Neon)
 ```

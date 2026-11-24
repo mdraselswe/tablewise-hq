@@ -506,7 +506,7 @@ A three-line sale performs roughly 12 statements in one transaction: advisory lo
 
 | Stage      | Layout                                                                                                                                                                                                                 |
 | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Demo (now) | Render web service running the Docker image (API + built web app), Render managed PostgreSQL.                                                                                                                          |
+| Demo (now) | Render web service running the Docker image (API + built web app), Neon serverless PostgreSQL.                                                                                                                         |
 | Production | 2+ instances across zones, managed PostgreSQL with a standby, automated backups and PITR, secrets in the platform's secret store, CI running the full `pnpm check` with a real PostgreSQL service before every deploy. |
 | Larger     | Web app on a CDN, API behind a load balancer, PgBouncer, a read replica for reporting, a warehouse fed from events, services extracted as below.                                                                       |
 
