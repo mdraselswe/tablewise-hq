@@ -5,6 +5,15 @@ import { LoginPage } from "@/features/auth/login-page.tsx";
 import { NotFoundPage, RouteErrorPage } from "./error-pages.tsx";
 import { GuestOnly, HomeRedirect, RequireRole, RequireSession } from "./guards.tsx";
 
+/*
+ * Every page is its own chunk (route.lazy), so the POS never downloads the HQ
+ * dashboard and the first screen stays small. The router keeps the current page
+ * on screen until the next one is ready, which feels instant.
+ */
+const page = (load: () => Promise<{ default: React.ComponentType }>) => async () => ({
+  Component: (await load()).default,
+});
+
 export const router = createBrowserRouter([
   {
     errorElement: <RouteErrorPage />,
@@ -21,7 +30,9 @@ export const router = createBrowserRouter([
               {
                 path: "hq",
                 element: <RequireRole role="HQ_ADMIN" />,
-                children: [],
+                children: [
+                  { index: true, lazy: page(() => import("@/features/dashboard/dashboard-page.tsx")) },
+                ],
               },
               {
                 path: "outlet",
