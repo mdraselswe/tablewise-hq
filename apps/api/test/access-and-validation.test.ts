@@ -50,6 +50,14 @@ describe("authentication, authorization and validation", () => {
   it("keeps outlet staff inside their own outlet", async () => {
     expect((await api(app, tokenA).get(`/outlets/${fixture.outletB.id}/menu`)).status).toBe(403);
     expect((await api(app, tokenA).get(`/outlets/${fixture.outletB.id}/inventory`)).status).toBe(403);
+    expect((await api(app, tokenA).get(`/outlets/${fixture.outletB.id}/assignments`)).status).toBe(403);
+    // Staff may read their own outlet's assignments (inventory needs item names), but never change them.
+    expect((await api(app, tokenA).get(`/outlets/${fixture.outletA.id}/assignments`)).status).toBe(200);
+    const change = await api(app, tokenA).put(
+      `/outlets/${fixture.outletA.id}/assignments/${fixture.items.latte}`,
+      { priceOverrideMinor: 1 },
+    );
+    expect(change.status).toBe(403);
     const sale = await api(app, tokenA).post(`/outlets/${fixture.outletB.id}/sales`, {
       lines: [{ menuItemId: fixture.items.latte, quantity: 1 }],
       paymentMethod: "CASH",

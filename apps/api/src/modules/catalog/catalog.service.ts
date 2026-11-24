@@ -73,7 +73,7 @@ export class CatalogService {
     return this.repository.listAssignmentsForMenuItem(menuItemId);
   }
 
-  // ---- Outlet assignments (HQ) ------------------------------------------------------
+  // ---- Outlet assignments (HQ writes, outlet staff read their own) ------------------------------------------------------
 
   async listAssignments(outletId: string): Promise<OutletAssignment[]> {
     await this.outlets.require(outletId);

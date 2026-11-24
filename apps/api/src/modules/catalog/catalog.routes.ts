@@ -70,8 +70,9 @@ export function catalogRoutes(controller: CatalogController): RouteDefinition[] 
       method: "get",
       path: "/outlets/:outletId/assignments",
       summary: "List an outlet's assigned items",
-      description: "Includes unavailable items, base price, override and effective price.",
-      roles: HQ,
+      description:
+        "Includes unavailable items, base price, override and effective price. HQ sees every outlet; outlet staff see their own (read-only).",
+      outletParam: "outletId",
       params: OutletIdParams,
       handler: controller.listAssignments,
     }),
