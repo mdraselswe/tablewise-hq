@@ -72,3 +72,14 @@ export class InvalidStateTransitionError extends AppError {
     super(409, ErrorCode.INVALID_STATE_TRANSITION, `Cannot move from ${from} to ${to}`, { from, to });
   }
 }
+
+/** Same Idempotency-Key, different request: replaying the old result would hide the new one. */
+export class IdempotencyKeyReusedError extends AppError {
+  constructor() {
+    super(
+      422,
+      ErrorCode.IDEMPOTENCY_KEY_REUSED,
+      "This Idempotency-Key was already used for a different request. Send a new key for a new sale.",
+    );
+  }
+}

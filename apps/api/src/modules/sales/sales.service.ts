@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type {
   CreateSaleRequest,
   ListSalesQuery,
@@ -11,7 +11,12 @@ import type {
 import { type Actor, canAccessOutlet, scopeOutlet } from "@/platform/auth/actor.ts";
 import { type Database, isUniqueViolation } from "@/platform/db/database.ts";
 import type { Outbox } from "@/platform/events/outbox.ts";
-import { ItemsNotSellableError, NotFoundError, ValidationError } from "@/platform/http/errors.ts";
+import {
+  IdempotencyKeyReusedError,
+  ItemsNotSellableError,
+  NotFoundError,
+  ValidationError,
+} from "@/platform/http/errors.ts";
 import type { SalesRepository } from "./sales.repository.ts";
 
 /** Ports: what Sales needs from other modules, declared here and implemented elsewhere. */
@@ -57,6 +62,24 @@ function normalizeLines(lines: CreateSaleRequest["lines"]): { menuItemId: string
     .sort((a, b) => (a.menuItemId < b.menuItemId ? -1 : 1));
 }
 
+/**
+ * Fingerprint of what a retry must repeat. Built from the normalised lines, so the
+ * same order sent with its lines in another order or split differently still matches.
+ * `occurredAt` is compared as an instant, so "+06:00" and "Z" spellings agree.
+ */
+function requestHash(
+  lines: readonly { menuItemId: string; quantity: number }[],
+  request: CreateSaleRequest,
+): Buffer {
+  const occurredAt = request.occurredAt === undefined ? null : Date.parse(request.occurredAt);
+  const canonical = JSON.stringify([
+    lines.map((line) => [line.menuItemId.toLowerCase(), line.quantity]),
+    request.paymentMethod,
+    occurredAt,
+  ]);
+  return createHash("sha256").update(canonical).digest();
+}
+
 export class SalesService {
   constructor(
     private readonly db: Database,
@@ -83,15 +106,19 @@ export class SalesService {
   async createSale(command: CreateSaleCommand): Promise<{ sale: Sale; replayed: boolean }> {
     const { outletId, request, idempotencyKey, actor } = command;
     const lines = normalizeLines(request.lines);
-    const occurredAt = this.#resolveOccurredAt(request.occurredAt, command.trustedBackfill === true);
+    const hash = idempotencyKey ? requestHash(lines, request) : null;
 
     try {
       return await this.db.transaction(async () => {
-        if (idempotencyKey) {
+        if (idempotencyKey && hash) {
           await this.repository.lockIdempotencyKey(outletId, idempotencyKey);
-          const existingId = await this.repository.findIdByIdempotencyKey(outletId, idempotencyKey);
-          if (existingId) return { sale: await this.#load(existingId), replayed: true };
+          const replay = await this.#replay(outletId, idempotencyKey, hash);
+          if (replay) return replay;
         }
+
+        // Validated after the replay check: a retry of a sale that was accepted near
+        // the end of the backdating window must still get the original sale back.
+        const occurredAt = this.#resolveOccurredAt(request.occurredAt, command.trustedBackfill === true);
 
         const outlet = await this.ports.outlets.requireActive(outletId);
         const ids = lines.map((line) => line.menuItemId);
@@ -128,6 +155,7 @@ export class SalesService {
           totalMinor: saleLines.reduce((sum, line) => sum + line.lineTotalMinor, 0),
           itemCount: saleLines.reduce((sum, line) => sum + line.quantity, 0),
           idempotencyKey: idempotencyKey ?? null,
+          requestHash: hash,
           cashierId: actor.id,
           cashierName: actor.fullName,
           occurredAt,
@@ -157,9 +185,9 @@ export class SalesService {
       });
     } catch (error) {
       // Defence in depth: the unique constraint is the final guard against duplicates.
-      if (idempotencyKey && isUniqueViolation(error, "sales_outlet_idempotency_key")) {
-        const existingId = await this.repository.findIdByIdempotencyKey(outletId, idempotencyKey);
-        if (existingId) return { sale: await this.#load(existingId), replayed: true };
+      if (idempotencyKey && hash && isUniqueViolation(error, "sales_outlet_idempotency_key")) {
+        const replay = await this.#replay(outletId, idempotencyKey, hash);
+        if (replay) return replay;
       }
       throw error;
     }
@@ -175,6 +203,18 @@ export class SalesService {
   async listSales(actor: Actor, query: ListSalesQuery): Promise<Paginated<SaleSummary>> {
     const { items, total } = await this.repository.list(query, scopeOutlet(actor, query.outletId));
     return { items, total, page: query.page, pageSize: query.pageSize };
+  }
+
+  /** The sale already recorded under this key, provided the request is the same one. */
+  async #replay(
+    outletId: string,
+    idempotencyKey: string,
+    hash: Buffer,
+  ): Promise<{ sale: Sale; replayed: true } | undefined> {
+    const existing = await this.repository.findByIdempotencyKey(outletId, idempotencyKey);
+    if (!existing) return undefined;
+    if (existing.requestHash && !existing.requestHash.equals(hash)) throw new IdempotencyKeyReusedError();
+    return { sale: await this.#load(existing.id), replayed: true };
   }
 
   async #load(saleId: string): Promise<Sale> {

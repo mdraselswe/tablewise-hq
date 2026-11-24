@@ -22,6 +22,7 @@ export function salesRoutes(controller: SalesController): RouteDefinition[] {
         "assigns the next gap-free receipt number for the outlet and stores the sale, all in one transaction.",
         "Send an `Idempotency-Key` (UUID) header so retries and offline re-syncs never create duplicates;",
         "a replay returns the original sale with status 200 and `Idempotent-Replayed: true`.",
+        "Reusing a key for a different request (lines, payment method or `occurredAt`) fails with 422 `IDEMPOTENCY_KEY_REUSED`.",
       ].join(" "),
       roles: ["OUTLET_STAFF"],
       outletParam: "outletId",

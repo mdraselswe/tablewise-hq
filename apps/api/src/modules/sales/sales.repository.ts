@@ -36,6 +36,7 @@ export interface NewSale {
   totalMinor: number;
   itemCount: number;
   idempotencyKey: string | null;
+  requestHash: Buffer | null;
   cashierId: string;
   cashierName: string;
   occurredAt: Date;
@@ -82,12 +83,15 @@ export class SalesRepository {
     await this.db.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [`sale:${outletId}:${key}`]);
   }
 
-  async findIdByIdempotencyKey(outletId: string, key: string): Promise<string | undefined> {
-    const row = await this.db.one<{ id: string }>(
-      "SELECT id FROM sales.sales WHERE outlet_id = $1 AND idempotency_key = $2",
+  async findByIdempotencyKey(
+    outletId: string,
+    key: string,
+  ): Promise<{ id: string; requestHash: Buffer | null } | undefined> {
+    const row = await this.db.one<{ id: string; request_hash: Buffer | null }>(
+      "SELECT id, request_hash FROM sales.sales WHERE outlet_id = $1 AND idempotency_key = $2",
       [outletId, key],
     );
-    return row?.id;
+    return row && { id: row.id, requestHash: row.request_hash };
   }
 
   /**
@@ -110,8 +114,8 @@ export class SalesRepository {
     const row = await this.db.one<SaleRow>(
       `INSERT INTO sales.sales
          (id, outlet_id, receipt_seq, receipt_no, payment_method, total_minor, item_count,
-          idempotency_key, cashier_id, cashier_name, occurred_at, business_date)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, ($11::timestamptz AT TIME ZONE $12)::date)
+          idempotency_key, request_hash, cashier_id, cashier_name, occurred_at, business_date)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, ($12::timestamptz AT TIME ZONE $13)::date)
        RETURNING ${SALE_COLUMNS}`,
       [
         sale.id,
@@ -122,6 +126,7 @@ export class SalesRepository {
         sale.totalMinor,
         sale.itemCount,
         sale.idempotencyKey,
+        sale.requestHash,
         sale.cashierId,
         sale.cashierName,
         sale.occurredAt,

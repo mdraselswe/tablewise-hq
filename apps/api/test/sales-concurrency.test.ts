@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, createFixture, createTestContext, type Fixture, stockOf, truncateAll } from "./helpers.ts";
 
 /**
@@ -18,17 +18,25 @@ describe("sales under concurrency", () => {
     tokenA = await fixture.token(fixture.staffA);
   });
 
+  afterEach(() => vi.useRealTimers());
   afterAll(() => context.close());
 
   const sell = (
     lines: { menuItemId: string; quantity: number }[],
-    options: { key?: string; token?: string; outletId?: string } = {},
+    options: {
+      key?: string;
+      token?: string;
+      outletId?: string;
+      paymentMethod?: string;
+      occurredAt?: string;
+    } = {},
   ) => {
     const request = api(app, options.token ?? tokenA).post(
       `/outlets/${options.outletId ?? fixture.outletA.id}/sales`,
       {
         lines,
-        paymentMethod: "CASH",
+        paymentMethod: options.paymentMethod ?? "CASH",
+        ...(options.occurredAt ? { occurredAt: options.occurredAt } : {}),
       },
     );
     return options.key ? request.set("Idempotency-Key", options.key) : request;
@@ -116,6 +124,56 @@ describe("sales under concurrency", () => {
     for (const replay of replays) expect(replay.headers["idempotent-replayed"]).toBe("true");
     expect(new Set(responses.map((response) => response.body.id)).size).toBe(1);
     expect(await stockOf(container.db, fixture.outletA.id, fixture.items.latte)).toBe(98);
+  });
+
+  it("rejects an Idempotency-Key reused for a different order instead of replaying the old sale", async () => {
+    const key = randomUUID();
+    const first = await sell([{ menuItemId: fixture.items.latte, quantity: 2 }], { key });
+    expect(first.status).toBe(201);
+
+    const otherLines = await sell([{ menuItemId: fixture.items.burger, quantity: 3 }], { key });
+    const otherPayment = await sell([{ menuItemId: fixture.items.latte, quantity: 2 }], {
+      key,
+      paymentMethod: "CARD",
+    });
+    for (const response of [otherLines, otherPayment]) {
+      expect(response.status).toBe(422);
+      expect(response.body.error.code).toBe("IDEMPOTENCY_KEY_REUSED");
+    }
+
+    // The same order sent again, with its lines split differently, is still a replay.
+    const retry = await sell(
+      [
+        { menuItemId: fixture.items.latte, quantity: 1 },
+        { menuItemId: fixture.items.latte, quantity: 1 },
+      ],
+      { key },
+    );
+    expect(retry.status).toBe(200);
+    expect(retry.body.id).toBe(first.body.id);
+    expect(await stockOf(container.db, fixture.outletA.id, fixture.items.burger)).toBe(25);
+    expect(await stockOf(container.db, fixture.outletA.id, fixture.items.latte)).toBe(98);
+  });
+
+  it("replays a backdated sale even after it falls outside the backdating window", async () => {
+    vi.useFakeTimers({ toFake: ["Date"], now: Date.now() });
+    const key = randomUUID();
+    const occurredAt = new Date(Date.now() - 71 * 60 * 60_000).toISOString();
+    const first = await sell([{ menuItemId: fixture.items.latte, quantity: 1 }], { key, occurredAt });
+    expect(first.status).toBe(201);
+
+    // The reply was lost; the offline till retries two hours later, now 73 hours after the sale.
+    vi.setSystemTime(Date.now() + 2 * 60 * 60_000);
+    const retry = await sell([{ menuItemId: fixture.items.latte, quantity: 1 }], { key, occurredAt });
+    expect(retry.status).toBe(200);
+    expect(retry.body.id).toBe(first.body.id);
+
+    // A new sale that old is still refused.
+    const late = await sell([{ menuItemId: fixture.items.latte, quantity: 1 }], {
+      key: randomUUID(),
+      occurredAt,
+    });
+    expect(late.status).toBe(400);
   });
 
   it("rolls back a failed sale completely, including its receipt number", async () => {

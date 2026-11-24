@@ -290,6 +290,11 @@ export default function PosPage() {
         setIssues(new Map(ids.map((id) => [id, "No longer on this outlet's menu."])));
         void queryClient.invalidateQueries({ queryKey: keys.catalog.outletMenu(outletId) });
         toast.error("Some items were taken off the menu. Nothing was charged.");
+      } else if (error.code === "IDEMPOTENCY_KEY_REUSED") {
+        // The cart was already charged (the reply was lost) and then the payment method
+        // changed. Recording it again could charge twice, so send the cashier to check.
+        void queryClient.invalidateQueries({ queryKey: keys.sales.all });
+        toast.error("This cart may already be charged. Check Sales history before charging again.");
       } else {
         toast.error(error.message);
       }
