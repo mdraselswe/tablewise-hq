@@ -91,9 +91,10 @@ export function createApp(container: Container): Express {
         },
       }),
     );
-    // Client-side routing: every other GET returns the app shell.
+    // Client-side routing: every other GET (and HEAD, which uptime monitors send) returns the app shell.
     app.use((req, res, next) => {
-      if (req.method !== "GET" || req.path.startsWith("/health")) return next();
+      const read = req.method === "GET" || req.method === "HEAD";
+      if (!read || req.path.startsWith("/health")) return next();
       res.setHeader("Cache-Control", "no-cache");
       res.sendFile(path.join(root, "index.html"));
     });

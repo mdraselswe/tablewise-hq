@@ -16,13 +16,14 @@ export interface TestContext {
   close: () => Promise<void>;
 }
 
-export function createTestContext(): TestContext {
+export function createTestContext(overrides: Record<string, string> = {}): TestContext {
   const env = loadEnv({
     NODE_ENV: "test",
     DATABASE_URL: TEST_DATABASE_URL,
     DATABASE_POOL_MAX: "20",
     JWT_SECRET: "test-secret-that-is-long-enough-0123456789",
     MIGRATE_ON_BOOT: "false",
+    ...overrides,
   });
   const container = createContainer(env, createLogger(env));
   return { container, app: createApp(container), close: () => container.close() };
