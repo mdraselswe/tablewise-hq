@@ -2,7 +2,7 @@ import type { Request, Response } from "express";
 import pg from "pg";
 import { type AnyIntegrationEvent, REALTIME_EVENT_TYPES } from "@tablewise/contracts";
 import { type Actor, canAccessOutlet } from "@/platform/auth/actor.ts";
-import type { Database } from "@/platform/db/database.ts";
+import { type Database, sslOption } from "@/platform/db/database.ts";
 import type { EventBus } from "@/platform/events/event-bus.ts";
 import { UnauthenticatedError } from "@/platform/http/errors.ts";
 import type { Logger } from "@/platform/logger.ts";
@@ -96,7 +96,7 @@ export class RealtimeGateway {
     const listener = new pg.Client({
       connectionString: this.connection.connectionString,
       application_name: "tablewise-realtime",
-      ...(this.connection.ssl ? { ssl: { rejectUnauthorized: false } } : {}),
+      ...sslOption(this.connection.ssl),
     });
     listener.on("notification", (message) => {
       if (message.channel !== CHANNEL || !message.payload) return;

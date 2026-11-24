@@ -21,6 +21,16 @@ export interface DatabaseOptions {
   onCallbackError?: (error: unknown) => void;
 }
 
+/**
+ * TLS settings for every PostgreSQL connection the API opens. `true` verifies the
+ * server certificate against Node's CA bundle, so a man in the middle cannot pose as
+ * the database. A provider with a private CA sets `sslmode`/`sslrootcert` in the
+ * connection string, which pg applies on top of this.
+ */
+export function sslOption(enabled: boolean): { ssl?: true } {
+  return enabled ? { ssl: true } : {};
+}
+
 const warnCallbackError = (error: unknown): void => {
   process.emitWarning(error instanceof Error ? error : String(error), "AfterCommitCallbackError");
 };
@@ -53,7 +63,7 @@ export class Database {
       application_name: options.applicationName ?? "tablewise-api",
       idleTimeoutMillis: 30_000,
       connectionTimeoutMillis: 10_000,
-      ...(options.ssl ? { ssl: { rejectUnauthorized: false } } : {}),
+      ...sslOption(options.ssl),
     });
     return new Database(pool, options.onCallbackError);
   }
