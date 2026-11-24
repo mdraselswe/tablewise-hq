@@ -1,14 +1,17 @@
 import { useQuery } from "@tanstack/react-query";
 import { cn } from "cn";
-import { ChevronsUpDown, LogOut, Menu as MenuIcon, Moon, Sun } from "lucide-react";
+import { ChevronsUpDown, LogOut, Menu as MenuIcon, Moon, Search, Sun } from "lucide-react";
 import { useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigation } from "react-router";
 import { outletsQuery } from "@/api/resources.ts";
 import { navFor } from "@/app/navigation.ts";
 import { Button } from "@/components/ui/button.tsx";
 import { Menu, MenuContent, MenuItem, MenuLabel, MenuSeparator, MenuTrigger } from "@/components/ui/menu.tsx";
+import { Kbd } from "@/components/ui/misc.tsx";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet.tsx";
 import { isHq, useLogout, useSessionUser } from "@/features/auth/session.ts";
+import { showCommandPalette } from "@/features/command/command-bus.ts";
+import { CommandPalette } from "@/features/command/command-palette.tsx";
 import { type ConnectionState, useConnectionState } from "@/features/realtime/live-store.ts";
 import { useLiveUpdates } from "@/features/realtime/use-live-updates.ts";
 import { toggleTheme, useTheme } from "@/hooks/use-theme.ts";
@@ -138,6 +141,21 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         <ConnectionBadge />
       </div>
       <Context />
+      <button
+        type="button"
+        onClick={() => {
+          onNavigate?.();
+          showCommandPalette();
+        }}
+        className="flex h-9 items-center gap-2 rounded-md border bg-card px-2.5 text-[0.8125rem] text-muted-foreground shadow-(--shadow-sm) transition-colors hover:text-foreground"
+      >
+        <Search className="size-3.5" aria-hidden="true" />
+        Search
+        <span className="ml-auto flex gap-0.5">
+          <Kbd>Ctrl</Kbd>
+          <Kbd>K</Kbd>
+        </span>
+      </button>
       <Navigation {...(onNavigate ? { onNavigate } : {})} />
       <div className="mt-auto">
         <UserMenu />
@@ -163,6 +181,7 @@ function NavigationProgress() {
 }
 
 export function AppShell() {
+  const user = useSessionUser();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   useLiveUpdates(true);
@@ -178,6 +197,9 @@ export function AppShell() {
         <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b bg-background/85 px-4 backdrop-blur lg:hidden">
           <Wordmark />
           <div className="flex items-center gap-1">
+            <Button variant="ghost" size="icon" onClick={showCommandPalette} aria-label="Search">
+              <Search />
+            </Button>
             <Button
               variant="ghost"
               size="icon"
@@ -204,6 +226,7 @@ export function AppShell() {
           <Outlet />
         </main>
       </div>
+      <CommandPalette key={user.id} />
     </div>
   );
 }
