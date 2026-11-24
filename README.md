@@ -4,7 +4,7 @@ A multi-outlet food and beverage platform. HQ owns the master menu, decides whic
 
 **Single company -> many outlets -> HQ assigns the menu -> outlets sell -> HQ sees reports.**
 
-- Live demo: `https://tablewise-hq.onrender.com` (link added after deploy)
+- **Live demo: https://tablewise-hq.onrender.com** (free instance: the first visit after 15 idle minutes takes up to a minute to wake). Demo accounts are listed [below](#demo-accounts).
 - API reference (generated from the code): `/api/docs`, raw OpenAPI 3.1 at `/api/openapi.json`
 - Architecture, ERD, scaling plan, microservices path and offline POS strategy: [docs/architecture.md](docs/architecture.md)
 - Decision records: [docs/adr/](docs/adr/)
