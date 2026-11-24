@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { DateRangeShape, Id, isOrderedRange, PaginationQuery, RANGE_ORDER_ISSUE } from "./common.ts";
+import { DateRangeShape, Id, isOrderedRange, PageSize, RANGE_ORDER_ISSUE } from "./common.ts";
 
 /** Header carrying a client-generated UUID. Retrying with the same key never creates a second sale. */
 export const IDEMPOTENCY_KEY_HEADER = "Idempotency-Key";
@@ -30,10 +30,17 @@ export const IdempotencyKey = z
   .overwrite((value) => value.toLowerCase())
   .optional();
 
-export const ListSalesQuery = PaginationQuery.extend({
-  ...DateRangeShape,
-  outletId: Id.optional(),
-}).refine(isOrderedRange, RANGE_ORDER_ISSUE);
+/** Without `from`/`to` the list covers the last 30 trading days. */
+export const ListSalesQuery = z
+  .object({
+    ...DateRangeShape,
+    outletId: Id.optional(),
+    cursor: Id.optional().meta({
+      description: "`nextCursor` of the previous page; omit for the newest page.",
+    }),
+    pageSize: PageSize,
+  })
+  .refine(isOrderedRange, RANGE_ORDER_ISSUE);
 export type ListSalesQuery = z.output<typeof ListSalesQuery>;
 
 export const SaleParams = z.object({ saleId: Id });

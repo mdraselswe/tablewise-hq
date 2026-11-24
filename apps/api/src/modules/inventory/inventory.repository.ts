@@ -1,6 +1,13 @@
-import type { ListMovementsQuery, StockLevel, StockMovement, StockReason } from "@tablewise/contracts";
+import {
+  COUNT_CAP,
+  type CursorPage,
+  type ListMovementsQuery,
+  type StockLevel,
+  type StockMovement,
+  type StockReason,
+} from "@tablewise/contracts";
 import type { Database } from "@/platform/db/database.ts";
-import { pageWindow, toIso } from "@/platform/db/sql.ts";
+import { cappedCount, keysetPage, toIso } from "@/platform/db/sql.ts";
 
 interface LevelRow {
   outlet_id: string;
@@ -175,27 +182,44 @@ export class InventoryRepository {
     );
   }
 
-  async listMovements(
-    outletId: string,
-    query: ListMovementsQuery,
-  ): Promise<{ items: StockMovement[]; total: number }> {
-    const filters = `
-      WHERE outlet_id = $1
-        AND ($2::uuid IS NULL OR menu_item_id = $2)
-        AND ($3::text IS NULL OR reason = $3)`;
-    const params = [outletId, query.menuItemId ?? null, query.reason ?? null];
-    const { limit, offset } = pageWindow(query.page, query.pageSize);
+  /**
+   * The audit trail, newest first, within a rolling window. Keyset pagination on
+   * (created_at, id), read through stock_movements_outlet_created_idx (or the
+   * per-item index when filtered by item), so deep pages stay as cheap as the first.
+   */
+  async listMovements(outletId: string, query: ListMovementsQuery): Promise<CursorPage<StockMovement>> {
+    const params: unknown[] = [outletId, query.days];
+    let where = "WHERE outlet_id = $1 AND created_at >= now() - make_interval(days => $2)";
+    if (query.menuItemId) {
+      params.push(query.menuItemId);
+      where += ` AND menu_item_id = $${params.length}`;
+    }
+    if (query.reason) {
+      params.push(query.reason);
+      where += ` AND reason = $${params.length}`;
+    }
+    const countParams = [...params];
+    const countWhere = where;
+    if (query.cursor) {
+      params.push(query.cursor);
+      where += ` AND (created_at, id) <
+        (SELECT created_at, id FROM inventory.stock_movements WHERE id = $${params.length})`;
+    }
+    params.push(query.pageSize + 1);
     const [rows, count] = await Promise.all([
       this.db.many<MovementRow>(
-        `SELECT * FROM inventory.stock_movements ${filters}
-          ORDER BY created_at DESC, id DESC LIMIT $4 OFFSET $5`,
-        [...params, limit, offset],
-      ),
-      this.db.one<{ total: number }>(
-        `SELECT count(*)::int AS total FROM inventory.stock_movements ${filters}`,
+        `SELECT * FROM inventory.stock_movements ${where}
+          ORDER BY created_at DESC, id DESC LIMIT $${params.length}`,
         params,
       ),
+      cappedCount(this.db, `FROM inventory.stock_movements ${countWhere}`, countParams, COUNT_CAP),
     ]);
-    return { items: rows.map(toMovement), total: count?.total ?? 0 };
+    const page = keysetPage(rows, query.pageSize, (row) => String(row.id));
+    return {
+      ...count,
+      items: page.items.map(toMovement),
+      nextCursor: page.nextCursor,
+      pageSize: query.pageSize,
+    };
   }
 }

@@ -59,6 +59,7 @@ export function createContainer(env: Env, logger: Logger) {
     outlets: outlets.api,
     catalog: catalog.api,
     inventory: inventory.api,
+    businessTimeZone: env.BUSINESS_TIMEZONE,
   });
   const kitchen = createKitchenModule({ db, outbox, bus });
   const reporting = createReportingModule({ db, bus, businessTimeZone: env.BUSINESS_TIMEZONE });

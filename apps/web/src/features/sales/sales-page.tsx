@@ -21,9 +21,10 @@ import {
 } from "@/components/ui/sheet.tsx";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table.tsx";
 import { isHq, useSessionUser } from "@/features/auth/session.ts";
+import { useCursorPager } from "@/hooks/use-cursor-pager.ts";
 import { useFreshIds } from "@/hooks/use-fresh-ids.ts";
 import { isRangePreset, RANGE_OPTIONS, type RangePreset, rangeFor } from "@/lib/date-range.ts";
-import { formatCount, formatDateTime, formatMoney, PAYMENT_LABELS } from "@/lib/format.ts";
+import { formatDateTime, formatMoney, formatTotal, PAYMENT_LABELS } from "@/lib/format.ts";
 import { Receipt } from "./receipt.tsx";
 
 const PAGE_SIZE = 25;
@@ -80,7 +81,7 @@ export default function SalesPage() {
     ? (params.get("range") as RangePreset)
     : "7d";
   const outletFilter = params.get("outlet") ?? "all";
-  const page = Math.max(1, Number(params.get("page") ?? 1) || 1);
+  const pager = useCursorPager(`${preset}|${outletFilter}`);
   const [openSale, setOpenSale] = useState<SaleSummary | null>(null);
 
   const outlets = useQuery(outletsQuery);
@@ -93,7 +94,7 @@ export default function SalesPage() {
     salesQuery({
       ...range,
       outletId: hq && outletFilter !== "all" ? outletFilter : undefined,
-      page,
+      cursor: pager.cursor,
       pageSize: PAGE_SIZE,
     }),
   );
@@ -101,7 +102,7 @@ export default function SalesPage() {
   // Rows that arrive over the live stream after the first load get a one-time highlight.
   const fresh = useFreshIds(
     sales.data?.items.map((sale) => sale.id),
-    `${preset}|${outletFilter}|${page}`,
+    `${preset}|${outletFilter}|${pager.cursor ?? "newest"}`,
   );
 
   const update = (changes: Record<string, string | undefined>) =>
@@ -117,7 +118,8 @@ export default function SalesPage() {
       { replace: true },
     );
 
-  const pages = sales.data ? Math.max(1, Math.ceil(sales.data.total / PAGE_SIZE)) : 1;
+  const firstRow = (pager.pageNumber - 1) * PAGE_SIZE + 1;
+  const lastRow = firstRow + (sales.data?.items.length ?? 0) - 1;
   const pageTotal = (sales.data?.items ?? []).reduce((sum, sale) => sum + sale.totalMinor, 0);
 
   return (
@@ -130,9 +132,7 @@ export default function SalesPage() {
             <Select
               aria-label="Outlet"
               value={outletFilter}
-              onValueChange={(value) =>
-                update({ outlet: value === "all" ? undefined : value, page: undefined })
-              }
+              onValueChange={(value) => update({ outlet: value === "all" ? undefined : value })}
               options={[
                 { value: "all", label: "All outlets" },
                 ...(outlets.data ?? []).map((outlet) => ({
@@ -147,7 +147,7 @@ export default function SalesPage() {
           <Segmented
             aria-label="Date range"
             value={preset}
-            onChange={(value) => update({ range: value, page: undefined })}
+            onChange={(value) => update({ range: value })}
             options={RANGE_OPTIONS}
           />
         </>
@@ -210,25 +210,23 @@ export default function SalesPage() {
             </Table>
             <footer className="flex flex-wrap items-center justify-between gap-3 border-t px-5 py-3 text-xs text-muted-foreground">
               <span className="num">
-                {formatCount(sales.data?.total ?? 0)} sales · this page {formatMoney(pageTotal)} · page {page}{" "}
-                of {pages}
+                {firstRow}–{lastRow} of{" "}
+                {formatTotal(sales.data?.total ?? 0, sales.data?.totalCapped ?? false)} sales · this page{" "}
+                {formatMoney(pageTotal)}
               </span>
               <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={page <= 1}
-                  onClick={() => update({ page: String(page - 1) })}
-                >
-                  Previous
+                <Button variant="outline" size="sm" disabled={!pager.hasPrevious} onClick={pager.previous}>
+                  Newer
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
-                  disabled={page >= pages}
-                  onClick={() => update({ page: String(page + 1) })}
+                  disabled={!sales.data?.nextCursor}
+                  onClick={() => {
+                    if (sales.data?.nextCursor) pager.next(sales.data.nextCursor);
+                  }}
                 >
-                  Next
+                  Older
                 </Button>
               </div>
             </footer>

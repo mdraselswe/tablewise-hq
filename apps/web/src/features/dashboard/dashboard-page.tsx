@@ -171,7 +171,7 @@ function LiveFeed({
   outletId: string | undefined;
   outletNames: Map<string, string>;
 }) {
-  const recent = useQuery(salesQuery({ outletId, page: 1, pageSize: 8 }));
+  const recent = useQuery(salesQuery({ outletId, pageSize: 8 }));
   const fresh = useFreshIds(
     recent.data?.items.map((sale) => sale.id),
     outletId ?? "all",

@@ -1,9 +1,9 @@
 import { createHash, randomUUID } from "node:crypto";
 import type {
   CreateSaleRequest,
+  CursorPage,
   ListSalesQuery,
   Outlet,
-  Paginated,
   Sale,
   SaleLine,
   SaleSummary,
@@ -11,6 +11,7 @@ import type {
 import { type Actor, canAccessOutlet, scopeOutlet } from "@/platform/auth/actor.ts";
 import { type Database, isUniqueViolation } from "@/platform/db/database.ts";
 import type { Outbox } from "@/platform/events/outbox.ts";
+import { resolveRange } from "@/platform/time.ts";
 import {
   IdempotencyKeyReusedError,
   ItemsNotSellableError,
@@ -50,6 +51,7 @@ export interface CreateSaleCommand {
 }
 
 const MAX_BACKDATE_MS = 72 * 60 * 60_000;
+const DEFAULT_LIST_DAYS = 30;
 const MAX_CLOCK_SKEW_MS = 5 * 60_000;
 
 /** Merges repeated items and sorts by id: one line per item, and a stable lock order. */
@@ -90,6 +92,7 @@ export class SalesService {
       catalog: SalesCatalogPort;
       inventory: SalesInventoryPort;
     },
+    private readonly options: { businessTimeZone: string },
   ) {}
 
   /**
@@ -200,9 +203,16 @@ export class SalesService {
     return sale;
   }
 
-  async listSales(actor: Actor, query: ListSalesQuery): Promise<Paginated<SaleSummary>> {
-    const { items, total } = await this.repository.list(query, scopeOutlet(actor, query.outletId));
-    return { items, total, page: query.page, pageSize: query.pageSize };
+  /** Newest first. Without a date range it covers the last 30 trading days, so a bare call stays cheap. */
+  async listSales(actor: Actor, query: ListSalesQuery): Promise<CursorPage<SaleSummary>> {
+    const { from, to } = resolveRange(query, DEFAULT_LIST_DAYS, this.options.businessTimeZone);
+    return this.repository.list({
+      outletId: scopeOutlet(actor, query.outletId),
+      from,
+      to,
+      cursor: query.cursor,
+      pageSize: query.pageSize,
+    });
   }
 
   /** The sale already recorded under this key, provided the request is the same one. */

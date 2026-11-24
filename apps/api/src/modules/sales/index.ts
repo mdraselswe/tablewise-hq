@@ -20,12 +20,15 @@ export function createSalesModule(deps: {
   outlets: SalesOutletsPort;
   catalog: SalesCatalogPort;
   inventory: SalesInventoryPort;
+  businessTimeZone: string;
 }): { module: ModuleDefinition; api: SalesApi } {
-  const service = new SalesService(deps.db, new SalesRepository(deps.db), deps.outbox, {
-    outlets: deps.outlets,
-    catalog: deps.catalog,
-    inventory: deps.inventory,
-  });
+  const service = new SalesService(
+    deps.db,
+    new SalesRepository(deps.db),
+    deps.outbox,
+    { outlets: deps.outlets, catalog: deps.catalog, inventory: deps.inventory },
+    { businessTimeZone: deps.businessTimeZone },
+  );
   return {
     module: {
       name: "Sales",

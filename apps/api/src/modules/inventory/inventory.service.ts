@@ -1,7 +1,7 @@
 import type {
   AdjustStockRequest,
+  CursorPage,
   ListMovementsQuery,
-  Paginated,
   StockLevel,
   StockMovement,
   StockReason,
@@ -31,10 +31,8 @@ export class InventoryService {
     return this.repository.listLevels(outletId);
   }
 
-  listMovements(outletId: string, query: ListMovementsQuery): Promise<Paginated<StockMovement>> {
-    return this.repository
-      .listMovements(outletId, query)
-      .then(({ items, total }) => ({ items, total, page: query.page, pageSize: query.pageSize }));
+  listMovements(outletId: string, query: ListMovementsQuery): Promise<CursorPage<StockMovement>> {
+    return this.repository.listMovements(outletId, query);
   }
 
   /** Manual restock, correction or waste. Refuses any change that would go below zero. */

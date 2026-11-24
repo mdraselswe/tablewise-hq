@@ -1,6 +1,13 @@
-import type { ListSalesQuery, PaymentMethod, Sale, SaleLine, SaleSummary } from "@tablewise/contracts";
+import {
+  COUNT_CAP,
+  type CursorPage,
+  type PaymentMethod,
+  type Sale,
+  type SaleLine,
+  type SaleSummary,
+} from "@tablewise/contracts";
 import type { Database } from "@/platform/db/database.ts";
-import { pageWindow, toIso } from "@/platform/db/sql.ts";
+import { cappedCount, keysetPage, toIso } from "@/platform/db/sql.ts";
 
 interface SaleRow {
   id: string;
@@ -166,24 +173,49 @@ export class SalesRepository {
     return { ...toSummary(row), lines: lines.map(toLine) };
   }
 
-  async list(
-    query: ListSalesQuery,
-    outletId: string | undefined,
-  ): Promise<{ items: SaleSummary[]; total: number }> {
-    const filters = `
-      WHERE ($1::uuid IS NULL OR outlet_id = $1)
-        AND ($2::date IS NULL OR business_date >= $2)
-        AND ($3::date IS NULL OR business_date <= $3)`;
-    const params = [outletId ?? null, query.from ?? null, query.to ?? null];
-    const { limit, offset } = pageWindow(query.page, query.pageSize);
+  /**
+   * Newest first, one keyset page at a time. The sort key (business_date,
+   * occurred_at, id) is unique, and the cursor is the id of the last row shown: the
+   * next page starts strictly after that row's key, read through
+   * sales_history_idx / sales_outlet_history_idx, so deep pages cost no more than
+   * the first. Outlet filters are built into the SQL text (never values) so each
+   * shape gets a plan that uses its own index.
+   */
+  async list(filter: {
+    outletId: string | undefined;
+    from: string;
+    to: string;
+    cursor: string | undefined;
+    pageSize: number;
+  }): Promise<CursorPage<SaleSummary>> {
+    const params: unknown[] = [filter.from, filter.to];
+    let where = "WHERE business_date BETWEEN $1 AND $2";
+    if (filter.outletId) {
+      params.push(filter.outletId);
+      where += ` AND outlet_id = $${params.length}`;
+    }
+    const countParams = [...params];
+    const countWhere = where;
+    if (filter.cursor) {
+      params.push(filter.cursor);
+      where += ` AND (business_date, occurred_at, id) <
+        (SELECT business_date, occurred_at, id FROM sales.sales WHERE id = $${params.length})`;
+    }
+    params.push(filter.pageSize + 1);
     const [rows, count] = await Promise.all([
       this.db.many<SaleRow>(
-        `SELECT ${SALE_COLUMNS} FROM sales.sales ${filters}
-          ORDER BY business_date DESC, occurred_at DESC, receipt_seq DESC LIMIT $4 OFFSET $5`,
-        [...params, limit, offset],
+        `SELECT ${SALE_COLUMNS} FROM sales.sales ${where}
+          ORDER BY business_date DESC, occurred_at DESC, id DESC LIMIT $${params.length}`,
+        params,
       ),
-      this.db.one<{ total: number }>(`SELECT count(*)::int AS total FROM sales.sales ${filters}`, params),
+      cappedCount(this.db, `FROM sales.sales ${countWhere}`, countParams, COUNT_CAP),
     ]);
-    return { items: rows.map(toSummary), total: count?.total ?? 0 };
+    const page = keysetPage(rows, filter.pageSize, (row) => row.id);
+    return {
+      ...count,
+      items: page.items.map(toSummary),
+      nextCursor: page.nextCursor,
+      pageSize: filter.pageSize,
+    };
   }
 }

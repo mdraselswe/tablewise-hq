@@ -9,24 +9,10 @@ import type {
 } from "@tablewise/contracts";
 import { type Actor, scopeOutlet } from "@/platform/auth/actor.ts";
 import { ValidationError } from "@/platform/http/errors.ts";
+import { daysBetween, resolveRange } from "@/platform/time.ts";
 import type { ReportingRepository } from "./reporting.repository.ts";
 
 const MAX_RANGE_DAYS = 366;
-const DAY_MS = 86_400_000;
-
-/** "YYYY-MM-DD" for the current day in a time zone ("en-CA" formats dates as ISO). */
-export function todayIn(timeZone: string, now = new Date()): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(now);
-}
-
-export function addDays(date: string, days: number): string {
-  return new Date(Date.parse(`${date}T00:00:00Z`) + days * DAY_MS).toISOString().slice(0, 10);
-}
 
 export class ReportingService {
   constructor(
@@ -97,10 +83,8 @@ export class ReportingService {
   }
 
   #range(query: { from?: string | undefined; to?: string | undefined }, defaultDays: number): ReportRange {
-    const to = query.to ?? todayIn(this.businessTimeZone);
-    const from = query.from ?? addDays(to, -(defaultDays - 1));
-    const days = (Date.parse(to) - Date.parse(from)) / DAY_MS + 1;
-    if (days > MAX_RANGE_DAYS) {
+    const { from, to } = resolveRange(query, defaultDays, this.businessTimeZone);
+    if (daysBetween(from, to) > MAX_RANGE_DAYS) {
       throw new ValidationError([
         { path: "query.from", message: `A report can cover at most ${MAX_RANGE_DAYS} days` },
       ]);

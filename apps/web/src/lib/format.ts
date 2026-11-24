@@ -22,6 +22,11 @@ export function formatMoneyCompact(minor: number): string {
   return value < 10_000 ? `BDT ${moneyWhole.format(value)}` : `BDT ${compact.format(value)}`;
 }
 
+/** A list total that the server counts only up to a cap: "1,000+" beyond it. */
+export function formatTotal(total: number, capped: boolean): string {
+  return capped ? `${formatCount(total)}+` : formatCount(total);
+}
+
 export function formatCount(value: number): string {
   return integer.format(value);
 }

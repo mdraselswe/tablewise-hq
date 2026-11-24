@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { Id, PaginationQuery } from "./common.ts";
+import { Id, PageSize } from "./common.ts";
 
 export const StockReason = z.enum(["INITIAL", "SALE", "RESTOCK", "ADJUSTMENT", "WASTE"]);
 export type StockReason = z.infer<typeof StockReason>;
@@ -33,9 +33,26 @@ export const UpdateStockSettingsRequest = z.object({
 });
 export type UpdateStockSettingsRequest = z.infer<typeof UpdateStockSettingsRequest>;
 
-export const ListMovementsQuery = PaginationQuery.extend({
+/** Rolling windows the audit trail can be read in, newest first. */
+export const MOVEMENT_WINDOW_DAYS = [7, 30, 90, 365] as const;
+
+export const ListMovementsQuery = z.object({
   menuItemId: Id.optional(),
   reason: StockReason.optional(),
+  days: z.coerce
+    .number()
+    .int()
+    .refine((days) => (MOVEMENT_WINDOW_DAYS as readonly number[]).includes(days), {
+      message: `must be one of ${MOVEMENT_WINDOW_DAYS.join(", ")}`,
+    })
+    .default(30)
+    .meta({ description: "Only movements from the last N days (7, 30, 90 or 365). Default 30." }),
+  cursor: z
+    .string()
+    .regex(/^\d{1,19}$/, "must be a movement id")
+    .optional()
+    .meta({ description: "`nextCursor` of the previous page; omit for the newest page." }),
+  pageSize: PageSize,
 });
 export type ListMovementsQuery = z.output<typeof ListMovementsQuery>;
 

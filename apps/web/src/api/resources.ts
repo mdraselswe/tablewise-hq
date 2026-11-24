@@ -10,6 +10,7 @@ import type {
   Outlet,
   OutletAssignment,
   OutletMenuItem,
+  CursorPage,
   Paginated,
   RevenueReport,
   RevenueTrend,
@@ -145,7 +146,8 @@ export const stockLevelsQuery = (outletId: string) =>
 export interface MovementsFilter {
   menuItemId?: string | undefined;
   reason?: StockReason | undefined;
-  page?: number;
+  days?: number;
+  cursor?: string | undefined;
   pageSize?: number;
 }
 
@@ -153,7 +155,7 @@ export const movementsQuery = (outletId: string, filter: MovementsFilter) =>
   queryOptions({
     queryKey: keys.inventory.movements(outletId, filter),
     queryFn: ({ signal }) =>
-      http.get<Paginated<StockMovement>>(`/outlets/${outletId}/inventory/movements`, { ...filter }, signal),
+      http.get<CursorPage<StockMovement>>(`/outlets/${outletId}/inventory/movements`, { ...filter }, signal),
     placeholderData: (previous) => previous,
   });
 
@@ -172,14 +174,14 @@ export interface SalesFilter {
   outletId?: string | undefined;
   from?: string | undefined;
   to?: string | undefined;
-  page?: number;
+  cursor?: string | undefined;
   pageSize?: number;
 }
 
 export const salesQuery = (filter: SalesFilter) =>
   queryOptions({
     queryKey: keys.sales.list(filter),
-    queryFn: ({ signal }) => http.get<Paginated<SaleSummary>>("/sales", { ...filter }, signal),
+    queryFn: ({ signal }) => http.get<CursorPage<SaleSummary>>("/sales", { ...filter }, signal),
     placeholderData: (previous) => previous,
   });
 

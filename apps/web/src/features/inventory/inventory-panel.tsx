@@ -1,4 +1,4 @@
-import type { StockLevel, StockReason } from "@tablewise/contracts";
+import { MOVEMENT_WINDOW_DAYS, type StockLevel, type StockReason } from "@tablewise/contracts";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn } from "cn";
 import { ArrowDownRight, ArrowUpRight, History, PackagePlus, Search, SlidersHorizontal } from "lucide-react";
@@ -12,7 +12,8 @@ import { Card, CardHeader, EmptyState, FlashOnChange, Skeleton, Tooltip } from "
 import { Segmented } from "@/components/ui/segmented.tsx";
 import { Select } from "@/components/ui/select.tsx";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table.tsx";
-import { formatDateTime, STOCK_REASON_LABELS } from "@/lib/format.ts";
+import { useCursorPager } from "@/hooks/use-cursor-pager.ts";
+import { formatDateTime, formatTotal, STOCK_REASON_LABELS } from "@/lib/format.ts";
 import { type AdjustMode, AdjustStockDialog, type AdjustTarget } from "./adjust-dialog.tsx";
 
 interface Row {
@@ -24,6 +25,9 @@ interface Row {
 }
 
 type Filter = "all" | "low" | "out";
+type MovementWindow = (typeof MOVEMENT_WINDOW_DAYS)[number];
+
+const PAGE_SIZE = 15;
 
 function stockState(level: StockLevel): { tone: "success" | "warning" | "danger"; label: string } {
   if (level.onHand === 0) return { tone: "danger", label: "Out of stock" };
@@ -103,13 +107,15 @@ function MovementsCard({
 }) {
   const [menuItemId, setMenuItemId] = useState<string>("all");
   const [reason, setReason] = useState<StockReason | "all">("all");
-  const [page, setPage] = useState(1);
+  const [days, setDays] = useState<MovementWindow>(30);
+  const pager = useCursorPager(`${menuItemId}|${reason}|${days}`);
   const movements = useQuery(
     movementsQuery(outletId, {
       menuItemId: menuItemId === "all" ? undefined : menuItemId,
       reason: reason === "all" ? undefined : reason,
-      page,
-      pageSize: 15,
+      days,
+      cursor: pager.cursor,
+      pageSize: PAGE_SIZE,
     }),
   );
   const itemOptions = useMemo(
@@ -121,7 +127,8 @@ function MovementsCard({
     ],
     [rows],
   );
-  const pages = movements.data ? Math.max(1, Math.ceil(movements.data.total / movements.data.pageSize)) : 1;
+  const firstRow = (pager.pageNumber - 1) * PAGE_SIZE + 1;
+  const lastRow = firstRow + (movements.data?.items.length ?? 0) - 1;
 
   return (
     <Card>
@@ -134,10 +141,7 @@ function MovementsCard({
               aria-label="Item"
               size="sm"
               value={menuItemId}
-              onValueChange={(value) => {
-                setMenuItemId(value);
-                setPage(1);
-              }}
+              onValueChange={setMenuItemId}
               options={itemOptions}
               className="w-44"
             />
@@ -145,10 +149,7 @@ function MovementsCard({
               aria-label="Reason"
               size="sm"
               value={reason}
-              onValueChange={(value) => {
-                setReason(value);
-                setPage(1);
-              }}
+              onValueChange={setReason}
               options={[
                 { value: "all", label: "All reasons" },
                 ...Object.entries(STOCK_REASON_LABELS).map(([value, label]) => ({
@@ -157,6 +158,17 @@ function MovementsCard({
                 })),
               ]}
               className="w-40"
+            />
+            <Select
+              aria-label="Period"
+              size="sm"
+              value={String(days)}
+              onValueChange={(value) => setDays(Number(value) as MovementWindow)}
+              options={MOVEMENT_WINDOW_DAYS.map((value) => ({
+                value: String(value),
+                label: value === 365 ? "Last year" : `Last ${value} days`,
+              }))}
+              className="w-36"
             />
           </div>
         }
@@ -168,7 +180,9 @@ function MovementsCard({
           ))}
         </div>
       ) : movements.data?.items.length === 0 ? (
-        <EmptyState icon={<History />} title="No stock changes match" />
+        <EmptyState icon={<History />} title="No stock changes match">
+          {days < 365 ? "Try a longer period." : null}
+        </EmptyState>
       ) : (
         <>
           <Table>
@@ -217,24 +231,22 @@ function MovementsCard({
           </Table>
           <footer className="flex items-center justify-between border-t px-5 py-3 text-xs text-muted-foreground">
             <span className="num">
-              {movements.data?.total ?? 0} changes · page {page} of {pages}
+              {firstRow}–{lastRow} of{" "}
+              {formatTotal(movements.data?.total ?? 0, movements.data?.totalCapped ?? false)} changes
             </span>
             <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page <= 1}
-                onClick={() => setPage((current) => current - 1)}
-              >
-                Previous
+              <Button variant="outline" size="sm" disabled={!pager.hasPrevious} onClick={pager.previous}>
+                Newer
               </Button>
               <Button
                 variant="outline"
                 size="sm"
-                disabled={page >= pages}
-                onClick={() => setPage((current) => current + 1)}
+                disabled={!movements.data?.nextCursor}
+                onClick={() => {
+                  if (movements.data?.nextCursor) pager.next(movements.data.nextCursor);
+                }}
               >
-                Next
+                Older
               </Button>
             </div>
           </footer>
