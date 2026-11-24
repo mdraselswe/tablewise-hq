@@ -1,0 +1,11 @@
+# pnpm settings (pnpm reads them from this file).
+packages:
+  - apps/*
+  - packages/*
+# Exact versions in package.json; updates arrive through Dependabot PRs.
+saveExact: true
+savePrefix: ""
+# Supply-chain safety: never install a version published less than a day ago.
+minimumReleaseAge: 1440
+allowBuilds:
+  esbuild: true

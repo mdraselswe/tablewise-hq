@@ -1,0 +1,52 @@
+{
+  "name": "tablewise-hq",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Tablewise: multi-outlet F&B platform. HQ menu and pricing, outlet POS, inventory, kitchen display and live reporting.",
+  "type": "module",
+  "packageManager": "pnpm@12.18.0",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "pnpm --parallel --filter @tablewise/api --filter @tablewise/web dev",
+    "build": "pnpm --recursive build",
+    "typecheck": "pnpm --recursive typecheck",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "pnpm --recursive test",
+    "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test && pnpm build",
+    "db:up": "docker compose up -d db",
+    "db:down": "docker compose down",
+    "db:migrate": "pnpm --filter @tablewise/api db:migrate",
+    "db:seed": "pnpm --filter @tablewise/api db:seed",
+    "db:reset": "pnpm --filter @tablewise/api db:reset",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,mjs}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,css,yml,yaml,sql}": [
+      "prettier --write --ignore-unknown"
+    ]
+  },
+  "devDependencies": {
+    "@commitlint/cli": "21.2.4",
+    "@commitlint/config-conventional": "21.2.4",
+    "@eslint/js": "10.0.1",
+    "eslint": "10.15.0",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "eslint-plugin-react-refresh": "0.5.8",
+    "globals": "17.14.0",
+    "husky": "9.1.7",
+    "lint-staged": "17.6.2",
+    "prettier": "3.10.1",
+    "prettier-plugin-tailwindcss": "0.8.1",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "8.73.0"
+  }
+}
