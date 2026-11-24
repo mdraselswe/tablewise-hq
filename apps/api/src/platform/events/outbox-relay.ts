@@ -25,8 +25,12 @@ export interface OutboxRelayOptions {
  *   polls as a safety net (events written by another instance, retries).
  * - `FOR UPDATE SKIP LOCKED` lets any number of API instances run a relay without
  *   handing the same event to two of them.
- * - Each event is dispatched inside a SAVEPOINT: a failing event is rolled back,
- *   retried later with exponential backoff, and never blocks the rest of the batch.
+ * - Each consumer of an event runs in its own SAVEPOINT (see EventBus). If any of
+ *   them fails, the event is retried later with exponential backoff for those
+ *   consumers only, and never blocks the rest of the batch.
+ * - After `maxAttempts` the event is parked: logged as an error, counted by
+ *   `/health/ready`, and re-queued by `replayParked()` (`db:replay-events`) once
+ *   the cause is fixed.
  */
 export class OutboxRelay {
   readonly #batchSize: number;
@@ -113,8 +117,8 @@ export class OutboxRelay {
           occurredAt: row.occurred_at.toISOString(),
           payload: row.payload,
         } as AnyIntegrationEvent;
-        try {
-          await this.db.savepoint(() => this.bus.dispatch(event));
+        const failures = await this.bus.dispatch(event);
+        if (failures.length === 0) {
           await this.db.query(
             `UPDATE platform.outbox_events
                 SET published_at = now(), attempts = attempts + 1, last_error = NULL
@@ -122,24 +126,63 @@ export class OutboxRelay {
             [row.id],
           );
           delivered += 1;
-        } catch (error) {
-          const attempts = row.attempts + 1;
-          const backoffSeconds = Math.min(2 ** attempts, 300);
-          await this.db.query(
-            `UPDATE platform.outbox_events
-                SET attempts = $2, last_error = $3, available_at = now() + make_interval(secs => $4)
-              WHERE id = $1`,
-            [row.id, attempts, String((error as Error).message).slice(0, 1000), backoffSeconds],
-          );
-          const level = attempts >= this.#maxAttempts ? "error" : "warn";
-          this.logger[level](
-            { err: error, eventId: row.id, type: row.event_type, attempts },
-            "event delivery failed",
-          );
+          continue;
         }
+
+        const attempts = row.attempts + 1;
+        const backoffSeconds = Math.min(2 ** attempts, 300);
+        const lastError = failures
+          .map(
+            ({ consumer, error }) => `${consumer}: ${error instanceof Error ? error.message : String(error)}`,
+          )
+          .join("; ");
+        await this.db.query(
+          `UPDATE platform.outbox_events
+              SET attempts = $2, last_error = $3, available_at = now() + make_interval(secs => $4)
+            WHERE id = $1`,
+          [row.id, attempts, lastError.slice(0, 1000), backoffSeconds],
+        );
+        const parked = attempts >= this.#maxAttempts;
+        this.logger[parked ? "error" : "warn"](
+          {
+            err: failures[0]?.error,
+            eventId: row.id,
+            type: row.event_type,
+            consumers: failures.map((failure) => failure.consumer),
+            attempts,
+          },
+          parked ? "event parked after repeated delivery failures" : "event delivery failed",
+        );
       }
       // Count delivered events only: a batch of failures must not spin the loop.
       return delivered;
     });
+  }
+
+  /** Events that exhausted their attempts and wait for a human. */
+  async parkedCount(): Promise<number> {
+    const row = await this.db.one<{ count: number }>(
+      `SELECT count(*)::int AS count FROM platform.outbox_events
+        WHERE published_at IS NULL AND attempts >= $1`,
+      [this.#maxAttempts],
+    );
+    return row?.count ?? 0;
+  }
+
+  /**
+   * Re-queues parked events (all of them, or only `eventIds`) with a fresh attempt
+   * budget. Safe to run at any time: consumers that already succeeded are skipped
+   * by the inbox. `last_error` is kept until a delivery succeeds.
+   */
+  async replayParked(eventIds?: readonly string[]): Promise<number> {
+    const result = await this.db.query(
+      `UPDATE platform.outbox_events
+          SET attempts = 0, available_at = now()
+        WHERE published_at IS NULL AND attempts >= $1
+          AND ($2::uuid[] IS NULL OR id = ANY($2::uuid[]))`,
+      [this.#maxAttempts, eventIds ?? null],
+    );
+    this.kick();
+    return result.rowCount ?? 0;
   }
 }

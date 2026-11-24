@@ -9,7 +9,13 @@ const external = Object.keys(pkg.dependencies ?? {}).filter((name) => !name.star
 
 await rm(new URL("../dist", import.meta.url), { recursive: true, force: true });
 await build({
-  entryPoints: ["src/main.ts", "src/cli/migrate.ts", "src/cli/seed.ts", "src/cli/reset.ts"],
+  entryPoints: [
+    "src/main.ts",
+    "src/cli/migrate.ts",
+    "src/cli/seed.ts",
+    "src/cli/reset.ts",
+    "src/cli/replay-events.ts",
+  ],
   outdir: "dist",
   outbase: "src",
   bundle: true,

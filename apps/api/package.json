@@ -12,7 +12,8 @@
     "test:watch": "vitest",
     "db:migrate": "tsx --env-file-if-exists=../../.env src/cli/migrate.ts",
     "db:seed": "tsx --env-file-if-exists=../../.env src/cli/seed.ts",
-    "db:reset": "tsx --env-file-if-exists=../../.env src/cli/reset.ts"
+    "db:reset": "tsx --env-file-if-exists=../../.env src/cli/reset.ts",
+    "db:replay-events": "tsx --env-file-if-exists=../../.env src/cli/replay-events.ts"
   },
   "dependencies": {
     "@tablewise/contracts": "workspace:*",

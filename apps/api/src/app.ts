@@ -55,7 +55,13 @@ export function createApp(container: Container): Express {
   app.get("/health/ready", async (_req, res) => {
     try {
       await container.db.ping();
-      res.json({ status: "ok", database: "up", realtimeClients: container.realtime.connectedClients });
+      res.json({
+        status: "ok",
+        database: "up",
+        realtimeClients: container.realtime.connectedClients,
+        // Not a readiness failure (the API still serves traffic), but worth an alert above 0.
+        parkedEvents: await container.relay.parkedCount(),
+      });
     } catch {
       res.status(503).json({ status: "degraded", database: "down" });
     }
