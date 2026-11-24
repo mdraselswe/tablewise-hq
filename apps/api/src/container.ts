@@ -3,6 +3,7 @@ import { createCatalogModule } from "@/modules/catalog";
 import { createIdentityModule } from "@/modules/identity";
 import { createInventoryModule } from "@/modules/inventory";
 import { createOutletsModule } from "@/modules/outlets";
+import { createSalesModule } from "@/modules/sales";
 import { TokenService } from "@/platform/auth/token-service.ts";
 import { Database } from "@/platform/db/database.ts";
 import { EventBus } from "@/platform/events/event-bus.ts";
@@ -48,8 +49,21 @@ export function createContainer(env: Env, logger: Logger) {
   const outlets = createOutletsModule({ db, outbox });
   const inventory = createInventoryModule({ db, outbox });
   const catalog = createCatalogModule({ db, outlets: outlets.api, inventory: inventory.api });
+  const sales = createSalesModule({
+    db,
+    outbox,
+    outlets: outlets.api,
+    catalog: catalog.api,
+    inventory: inventory.api,
+  });
 
-  const modules: ModuleDefinition[] = [identity.module, outlets.module, catalog.module, inventory.module];
+  const modules: ModuleDefinition[] = [
+    identity.module,
+    outlets.module,
+    catalog.module,
+    inventory.module,
+    sales.module,
+  ];
 
   return {
     env,
@@ -65,6 +79,7 @@ export function createContainer(env: Env, logger: Logger) {
       outlets: outlets.api,
       catalog: catalog.api,
       inventory: inventory.api,
+      sales: sales.api,
     },
     async close(): Promise<void> {
       await relay.stop();
