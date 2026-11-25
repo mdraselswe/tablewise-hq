@@ -110,6 +110,30 @@ describe("master menu, outlet assignment and inventory", () => {
     ).rejects.toThrow(/stock_levels_on_hand_non_negative_chk/);
   });
 
+  it("writes off remaining stock with an audited movement when an item is unassigned", async () => {
+    const { outletA, items } = fixture;
+    const url = `/outlets/${outletA.id}/assignments/${items.fries}`;
+    expect(await stockOf(container.db, outletA.id, items.fries)).toBe(100);
+
+    const staffTry = await api(app, tokenA).delete(url);
+    expect(staffTry.status).toBe(403);
+
+    const removed = await api(app, hqToken).delete(url);
+    expect(removed.status).toBe(204);
+    expect(await stockOf(container.db, outletA.id, items.fries)).toBeUndefined();
+
+    const movements = await api(app, hqToken).get(
+      `/outlets/${outletA.id}/inventory/movements?menuItemId=${items.fries}`,
+    );
+    const rows: { delta: number; reason: string; balanceAfter: number }[] = movements.body.items;
+    expect(rows[0]).toMatchObject({ reason: "ADJUSTMENT", delta: -100, balanceAfter: 0 });
+    // The trail still adds up: everything that came in is accounted for as going out.
+    expect(rows.reduce((sum, row) => sum + row.delta, 0)).toBe(0);
+
+    const again = await api(app, hqToken).delete(url);
+    expect(again.status).toBe(404);
+  });
+
   it("refuses stock for an item that is not assigned to the outlet", async () => {
     const response = await api(app, tokenA).post(
       `/outlets/${fixture.outletA.id}/inventory/${fixture.items.cake}/adjustments`,

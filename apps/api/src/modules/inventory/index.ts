@@ -7,7 +7,10 @@ import { inventoryRoutes } from "./inventory.routes.ts";
 import { InventoryService } from "./inventory.service.ts";
 
 export type { SaleDeduction } from "./inventory.service.ts";
-export type InventoryApi = Pick<InventoryService, "initializeStock" | "deductForSale" | "adjust">;
+export type InventoryApi = Pick<
+  InventoryService,
+  "initializeStock" | "closeStock" | "deductForSale" | "adjust"
+>;
 
 export function createInventoryModule(deps: { db: Database; outbox: Outbox }): {
   module: ModuleDefinition;

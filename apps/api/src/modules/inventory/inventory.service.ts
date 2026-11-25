@@ -96,6 +96,30 @@ export class InventoryService {
   }
 
   /**
+   * Closes the stock level of an item that is being removed from an outlet's menu. Called by Catalog
+   * inside its transaction. Remaining stock is written off with a movement, so the audit trail
+   * still adds up to zero and shows who removed the item.
+   */
+  closeStock(input: { outletId: string; menuItemId: string; actor: Actor }): Promise<void> {
+    return this.db.transaction(async () => {
+      const [level] = await this.repository.lockLevels(input.outletId, [input.menuItemId]);
+      if (!level || level.onHand === 0) return;
+      await this.repository.insertMovements([
+        {
+          outletId: input.outletId,
+          menuItemId: input.menuItemId,
+          delta: -level.onHand,
+          balanceAfter: 0,
+          reason: "ADJUSTMENT",
+          note: "Item removed from the outlet menu",
+          actorId: input.actor.id,
+          actorName: input.actor.fullName,
+        },
+      ]);
+    });
+  }
+
+  /**
    * Deducts the stock of a sale. Runs inside the sale's transaction (it joins it),
    * so the deduction and the sale commit or roll back together.
    *

@@ -30,6 +30,7 @@ export interface CatalogInventoryPort {
     quantity: number;
     actor: Actor;
   }): Promise<void>;
+  closeStock(input: { outletId: string; menuItemId: string; actor: Actor }): Promise<void>;
 }
 
 export class CatalogService {
@@ -115,9 +116,13 @@ export class CatalogService {
     });
   }
 
-  async unassign(outletId: string, menuItemId: string): Promise<void> {
-    const removed = await this.repository.deleteAssignment(outletId, menuItemId);
-    if (!removed) throw new NotFoundError("Assignment");
+  /** Removing an item writes off its remaining stock first, so the audit trail never loses units. */
+  async unassign(outletId: string, menuItemId: string, actor: Actor): Promise<void> {
+    await this.db.transaction(async () => {
+      await this.inventory.closeStock({ outletId, menuItemId, actor });
+      const removed = await this.repository.deleteAssignment(outletId, menuItemId);
+      if (!removed) throw new NotFoundError("Assignment");
+    });
   }
 
   // ---- Outlet menu (outlet staff and HQ) --------------------------------------------

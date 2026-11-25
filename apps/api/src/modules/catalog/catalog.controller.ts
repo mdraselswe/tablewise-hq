@@ -53,8 +53,8 @@ export class CatalogController {
     return isNew ? created(assignment) : ok(assignment);
   };
 
-  unassign = async ({ params }: Ctx<AssignmentParams>): Promise<HttpReply> => {
-    await this.service.unassign(params.outletId, params.menuItemId);
+  unassign = async ({ params, actor }: Ctx<AssignmentParams>): Promise<HttpReply> => {
+    await this.service.unassign(params.outletId, params.menuItemId, actor);
     return noContent();
   };
 
