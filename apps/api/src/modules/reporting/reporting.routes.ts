@@ -3,7 +3,7 @@ import { route, type RouteDefinition } from "@/platform/http/route.ts";
 import type { ReportingController } from "./reporting.controller.ts";
 
 const RANGE_NOTE =
-  "Dates are trading days (YYYY-MM-DD) in the outlet's time zone; the default is today. HQ may filter by outlet; outlet staff always get their own outlet.";
+  "Dates are trading days (YYYY-MM-DD) in the outlet's time zone; the default is the last 7 days, today included. HQ may filter by outlet; outlet staff always get their own outlet.";
 
 export function reportingRoutes(controller: ReportingController): RouteDefinition[] {
   return [

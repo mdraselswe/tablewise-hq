@@ -256,11 +256,11 @@ All business endpoints live under `/api/v1`. The interactive reference at `/api/
 
 ### Reporting
 
-| Method | Path                     | Who | Purpose                                                                                     |
-| ------ | ------------------------ | --- | ------------------------------------------------------------------------------------------- |
-| GET    | `/reports/revenue`       | Any | Revenue, sale count, items sold and average ticket per outlet, plus totals. Default: today. |
-| GET    | `/reports/top-items`     | Any | Top items by quantity per outlet. `limit` 1 to 20, default 5. Default: today.               |
-| GET    | `/reports/revenue-trend` | Any | One zero-filled point per day. Default: the last 14 days.                                   |
+| Method | Path                     | Who | Purpose                                                                                               |
+| ------ | ------------------------ | --- | ----------------------------------------------------------------------------------------------------- |
+| GET    | `/reports/revenue`       | Any | Revenue, sale count, items sold and average ticket per outlet, plus totals. Default: the last 7 days. |
+| GET    | `/reports/top-items`     | Any | Top items by quantity per outlet. `limit` 1 to 20, default 5. Default: the last 7 days.               |
+| GET    | `/reports/revenue-trend` | Any | One zero-filled point per day. Default: the last 14 days.                                             |
 
 `from` and `to` are trading days (`YYYY-MM-DD`). HQ may pass `outletId`; outlet staff are always scoped to their own outlet. A report covers at most 366 days.
 

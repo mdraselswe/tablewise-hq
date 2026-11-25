@@ -29,6 +29,36 @@ describe("outbox events, reporting projections and the kitchen board", () => {
     expect(events).toHaveLength(1);
   });
 
+  it("defaults reports to the last 7 days and agrees with the sales table", async () => {
+    const { latte, burger } = fixture.items;
+    await sell([{ menuItemId: latte, quantity: 2 }]);
+    const twoDaysAgo = new Date(Date.now() - 2 * 24 * 3_600_000).toISOString();
+    const backdated = await api(app, tokenA).post(`/outlets/${fixture.outletA.id}/sales`, {
+      lines: [{ menuItemId: burger, quantity: 3 }],
+      paymentMethod: "CARD",
+      occurredAt: twoDaysAgo,
+    });
+    expect(backdated.status).toBe(201);
+    await container.relay.drain();
+
+    const raw = await container.db.one<{ revenue: string; sales: string }>(
+      "SELECT sum(total_minor) AS revenue, count(*) AS sales FROM sales.sales WHERE outlet_id = $1",
+      [fixture.outletA.id],
+    );
+    const revenue = await api(app, hqToken).get("/reports/revenue");
+    const outletA = revenue.body.outlets.find(
+      (outlet: { outletCode: string }) => outlet.outletCode === "AAA",
+    );
+    // A bare call includes the sale from two days ago, and the projection equals the source of truth.
+    expect(outletA.saleCount).toBe(Number(raw?.sales));
+    expect(outletA.revenueMinor).toBe(Number(raw?.revenue));
+    expect(outletA.saleCount).toBe(2);
+
+    const top = await api(app, hqToken).get(`/reports/top-items?outletId=${fixture.outletA.id}`);
+    const names = top.body.outlets[0].items.map((item: { menuItemId: string }) => item.menuItemId);
+    expect(names).toEqual(expect.arrayContaining([latte, burger]));
+  });
+
   it("reports revenue per outlet and the top 5 items per outlet", async () => {
     const { latte, burger, fries } = fixture.items;
     await sell([

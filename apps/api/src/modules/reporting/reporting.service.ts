@@ -13,6 +13,8 @@ import { daysBetween, resolveRange } from "@/platform/time.ts";
 import type { ReportingRepository } from "./reporting.repository.ts";
 
 const MAX_RANGE_DAYS = 366;
+/** A bare report call covers the last week, so it still shows data on a quiet day. */
+const DEFAULT_REPORT_DAYS = 7;
 
 export class ReportingService {
   constructor(
@@ -20,9 +22,9 @@ export class ReportingService {
     private readonly businessTimeZone: string,
   ) {}
 
-  /** Total revenue, sale count and average ticket per outlet. Defaults to today. */
+  /** Total revenue, sale count and average ticket per outlet. Defaults to the last 7 days. */
   async revenue(actor: Actor, query: ReportQuery): Promise<RevenueReport> {
-    const range = this.#range(query, 1);
+    const range = this.#range(query, DEFAULT_REPORT_DAYS);
     const outlets = await this.repository.revenueByOutlet(
       range.from,
       range.to,
@@ -43,9 +45,9 @@ export class ReportingService {
     };
   }
 
-  /** Top N (default 5) items by quantity per outlet. Defaults to today. */
+  /** Top N (default 5) items by quantity per outlet. Defaults to the last 7 days. */
   async topItems(actor: Actor, query: TopItemsQuery): Promise<TopItemsReport> {
-    const range = this.#range(query, 1);
+    const range = this.#range(query, DEFAULT_REPORT_DAYS);
     const rows = await this.repository.topItemsByOutlet(
       range.from,
       range.to,
