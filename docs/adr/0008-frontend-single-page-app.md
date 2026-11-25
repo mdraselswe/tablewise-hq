@@ -20,7 +20,7 @@ The brief requires React. The users are HQ staff on desktops and cashiers and co
 - **Next.js or another SSR framework.** Server rendering helps SEO and first paint for anonymous visitors, neither of which exists here: every page sits behind a login and is used for hours. SSR would add a Node rendering tier, a second server to scale and a split between server and client components, while the API already is the server. A static SPA deploys anywhere, caches perfectly and can later be wrapped for offline use (see the offline POS strategy in [architecture.md](../architecture.md)).
 - **Redux Toolkit / Zustand for server data.** They would duplicate what TanStack Query provides (caching, deduplication, background refresh, retries, optimistic updates) with hand-written code. RTK Query is close, but TanStack Query has the simpler cache-patching API that the realtime layer relies on.
 - **A ready-made component kit (MUI, Ant Design, Chakra).** Faster to start, but heavy, hard to restyle beyond its theme and recognisable at a glance. Owning thin components over accessible primitives keeps the bundle small and the look specific to this product.
-- **A chart library (Recharts, Chart.js).** The dashboard needs one area chart; a small SVG component avoids a 100 kB+ dependency and reads the design tokens directly.
+- **A chart library (Recharts, Chart.js).** The dashboard needs one area chart and a few sparklines; small SVG components avoid a 100 kB+ dependency and read the design tokens directly.
 
 ## Consequences
 

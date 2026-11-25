@@ -9,6 +9,20 @@ A multi-outlet food and beverage platform. HQ owns the master menu, decides whic
 - Architecture, ERD, scaling plan, microservices path and offline POS strategy: [docs/architecture.md](docs/architecture.md)
 - Decision records: [docs/adr/](docs/adr/)
 
+## Quick start
+
+Needs Node.js 24, Docker and pnpm (`corepack enable`).
+
+```bash
+cp .env.example .env
+pnpm install
+pnpm db:up      # PostgreSQL 18 in Docker on port 5433
+pnpm db:seed    # schema + demo data
+pnpm dev        # open http://localhost:5173
+```
+
+On the login page, click any demo account (password `Tablewise#2026`). Then follow the [5-minute tour](#try-it-a-5-minute-tour). Run the test suite with `pnpm test`.
+
 ---
 
 ## Contents
@@ -17,15 +31,16 @@ A multi-outlet food and beverage platform. HQ owns the master menu, decides whic
 2. [Tech stack and why](#tech-stack-and-why)
 3. [Getting started](#getting-started)
 4. [Demo accounts](#demo-accounts)
-5. [API endpoints](#api-endpoints)
-6. [Database schema](#database-schema)
-7. [Architecture](#architecture)
-8. [How a sale works](#how-a-sale-works)
-9. [Scaling strategy](#scaling-strategy)
-10. [Testing](#testing)
-11. [Frontend](#frontend)
-12. [Deployment](#deployment)
-13. [Project structure](#project-structure)
+5. [Try it: a 5-minute tour](#try-it-a-5-minute-tour)
+6. [API endpoints](#api-endpoints)
+7. [Database schema](#database-schema)
+8. [Architecture](#architecture)
+9. [How a sale works](#how-a-sale-works)
+10. [Scaling strategy](#scaling-strategy)
+11. [Testing](#testing)
+12. [Frontend](#frontend)
+13. [Deployment](#deployment)
+14. [Project structure](#project-structure)
 
 ---
 
@@ -120,6 +135,15 @@ The web dev server proxies `/api` to the API, so the browser sees one origin and
 | `pnpm db:replay-events`     | Re-queue outbox events parked after repeated delivery failures                   |
 | `docker compose up --build` | PostgreSQL + the production image on http://localhost:8080, seeded on first boot |
 
+### Troubleshooting
+
+| Symptom                                                    | Fix                                                                                                                                                                                                                              |
+| ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm db:up` fails to connect to Docker                    | Start Docker Desktop (or the Docker daemon) and run it again.                                                                                                                                                                    |
+| Port 5433 is already in use                                | Change the host port in `docker-compose.yml` and in `DATABASE_URL`; for tests set `TEST_DATABASE_URL` too.                                                                                                                       |
+| Tests fail with `database "tablewise_test" does not exist` | The test database is created only when the Docker volume is first made. Create it with `docker compose exec db createdb -U tablewise tablewise_test`, or recreate the volume with `docker compose down -v` (deletes local data). |
+| You want a fresh demo                                      | `pnpm db:reset` drops every schema, migrates and seeds again.                                                                                                                                                                    |
+
 ### Configuration
 
 Every variable is listed in [.env.example](.env.example) and validated by `apps/api/src/config/env.ts`; the process refuses to start with a clear message if one is wrong. The most important ones:
@@ -151,6 +175,20 @@ Password for every account: `Tablewise#2026`
 | `banani@tablewise.app`    | Outlet staff | Banani (BNN)    |
 
 The seed goes through the real module APIs, so stock movements, receipt numbers, kitchen tickets and report projections are exactly what production code produces. A fixed random seed makes every fresh demo identical. A few items are deliberately left low on stock so alerts have something to show, and a few orders from the last 25 minutes appear on each kitchen board.
+
+---
+
+## Try it: a 5-minute tour
+
+This walks through the brief end to end. Use two browser windows (one of them private) so HQ and an outlet are signed in side by side.
+
+1. **HQ creates a master item.** Sign in as `hq@tablewise.app`. Open **Master menu** -> **New item**. Saving a second item with the same SKU is refused.
+2. **HQ assigns it to one outlet at its own price.** Open **Outlets** -> **Gulshan** -> **Menu and pricing**, switch the filter to **Not assigned**, and click **Assign** on the new item. Set an opening stock and, optionally, a price override for Gulshan only.
+3. **The outlet sees only its own menu.** In the second window sign in as `gulshan@tablewise.app`. **Point of sale** lists only Gulshan's assigned items, at Gulshan's price. Other outlets do not have the new item.
+4. **Sell.** Add a few items, pick a payment method and click **Charge**. The receipt gets the next number in Gulshan's own sequence (`GUL-000…`). An item cannot be added beyond its stock; the API refuses such a sale with `INSUFFICIENT_STOCK` anyway.
+5. **Kitchen and stock follow the sale.** **Kitchen display** shows the order as a new ticket (**Start** -> **Ready** -> **Served**). **Inventory** shows the reduced stock and a `SALE` row in the audit trail; **Restock** adds stock back.
+6. **HQ sees it live.** Back in the HQ window, **Overview** updates without a reload: revenue by outlet, top 5 items per outlet and the live sales feed. **Sales** lists every receipt across outlets.
+7. **Explore the API.** The interactive reference is at http://localhost:4000/api/docs.
 
 ---
 
@@ -370,6 +408,16 @@ Integration tests run against a real PostgreSQL database (`tablewise_test`), reb
 | `test/pagination.test.ts`               | Sales and the stock audit trail page by cursor, newest first, with no gaps or repeats while new sales arrive; 1,005 sales page to the end with the total capped at 1,000. A bare sales list covers the last 30 trading days; movements use rolling windows. The master menu filters items not on an outlet's menu and refuses absurd page numbers.                                                                                                                                                                                                                                                                                                                                       |
 | `test/platform.test.ts`                 | The web app shell answers GET and HEAD (uptime monitors), assets are cached as immutable, a missing asset is a 404 (never the HTML shell), API misses stay JSON. A failing after-commit callback never turns a committed transaction into an error.                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | `src/**/*.test.ts`                      | Password hashing; trading-day helpers use the business time zone, not the server's; the environment refuses unknown time zones but accepts aliases such as `UTC`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `apps/web/src/lib/*.test.ts`            | Money formatting and parsing without floating-point drift, business-date arithmetic, kitchen timers past one hour, chart scaling and curve smoothing that never overshoots.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+
+Run part of the suite:
+
+```bash
+pnpm --filter @tablewise/api exec vitest run test/sales-concurrency.test.ts   # one API test file
+pnpm --filter @tablewise/web test                                             # frontend unit tests only (no database)
+```
+
+Tests use `postgres://tablewise:tablewise@localhost:5433/tablewise_test` by default; set `TEST_DATABASE_URL` to point them elsewhere (CI does this).
 
 ---
 
@@ -377,11 +425,11 @@ Integration tests run against a real PostgreSQL database (`tablewise_test`), reb
 
 `apps/web` is a React 19 single-page app with two experiences, chosen by the signed-in role:
 
-| Area       | Pages                                                                                                                                                                                                                                                                               |
-| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| HQ console | Dashboard (revenue, orders, average ticket with change vs the previous period, revenue trend, revenue by outlet, top 5 items per outlet, live sales feed, low-stock alerts), master menu, outlets, outlet detail (assignments, price overrides, stock), sales history with receipts |
-| Outlet app | POS (category tabs, search, stock-aware item grid, cart, payment method, receipt), kitchen display, inventory with restock and audit trail, the outlet's sales history                                                                                                              |
-| Shared     | Command palette (Ctrl/Cmd + K), light and dark themes, live updates, responsive layouts from 375 px phones to wide desktops                                                                                                                                                         |
+| Area       | Pages                                                                                                                                                                                                                                                                                                                                               |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| HQ console | Dashboard (revenue, orders, average ticket and items sold with change vs the previous period and a sparkline each, revenue trend against the previous period, revenue by outlet, top 5 items per outlet, live sales feed, low-stock alerts), master menu, outlets, outlet detail (assignments, price overrides, stock), sales history with receipts |
+| Outlet app | POS (category tabs, search, stock-aware item grid, cart, payment method, receipt; on phones a ticket bar that opens the order as a sheet), kitchen display, inventory with restock and audit trail, the outlet's sales history                                                                                                                      |
+| Shared     | Command palette (Ctrl/Cmd + K), light and dark themes, a collapsible sidebar on desktop and a bottom tab bar on phones, live updates, responsive layouts from 375 px phones to wide desktops                                                                                                                                                        |
 
 ### How it is organised
 
@@ -392,7 +440,7 @@ apps/web/src/
   components/   ui/ (design system primitives), layout/ (app shell), charts/
   features/     one folder per area: auth, dashboard, menu, outlets, pos, kitchen, inventory, sales, command, realtime
   hooks/ lib/   framework-free helpers (money and time formatting, fuzzy search, shared clock)
-  styles/       design tokens (OKLCH colours, motion, control sizes) for light and dark
+  styles/       design tokens (OKLCH colours, Inter and JetBrains Mono, motion, radii, control sizes) for light and dark
 ```
 
 Why a single-page app, TanStack Query and owned components rather than Next.js, Redux or a component kit: [ADR 0008](docs/adr/0008-frontend-single-page-app.md).
@@ -401,17 +449,19 @@ Features import from `api/`, `components/` and `lib/`, never from each other's i
 
 ### Decisions and why
 
-| Decision                                                    | Why                                                                                                                                                                                                                                                                    |
-| ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Server state in TanStack Query, almost no client state      | The database is the source of truth. Query keys are grouped per backend module, so a change invalidates exactly the screens that show it.                                                                                                                              |
-| Live updates patch the cache instead of refetching          | The SSE stream carries the changed values (a stock level, a ticket status). The client writes them straight into the cached queries and only debounces a refetch for derived data such as report totals. Ten outlets selling at once do not cause a storm of requests. |
-| URL-driven dialogs, tabs and filters (`?item=`, `?tab=`)    | Reload, the back button and deep links work; the command palette can open a menu item directly.                                                                                                                                                                        |
-| Optimistic updates where the server rarely says no          | Assigning items, price overrides and moving kitchen tickets feel instant; on an error the cache rolls back and a toast explains why.                                                                                                                                   |
-| The POS sends an `Idempotency-Key` per cart                 | A double tap or a retry on a flaky connection can never charge twice. The key changes whenever the cart changes, so a different order is never mistaken for a retry.                                                                                                   |
-| Accessible primitives (Base UI) styled with Tailwind tokens | Focus management, keyboard support and ARIA come from a maintained library; the look comes from one token file, so light and dark themes stay consistent.                                                                                                              |
-| A hand-written SVG chart instead of a chart library         | The dashboard needs one area chart. A small SVG component avoids a 100 kB+ dependency and uses the design tokens directly.                                                                                                                                             |
-| Route-level code splitting and vendor chunks                | The first load downloads only the shell and the current page. React, data and UI libraries sit in separate long-cached chunks, so a deploy usually invalidates only the app code.                                                                                      |
-| Motion with purpose                                         | Animations explain a change (a new sale slides in, a cart line expands, a ticket moves column) and stay short. They are disabled when the user prefers reduced motion.                                                                                                 |
+| Decision                                                    | Why                                                                                                                                                                                                                                                                                                                                                                                          |
+| ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Server state in TanStack Query, almost no client state      | The database is the source of truth. Query keys are grouped per backend module, so a change invalidates exactly the screens that show it.                                                                                                                                                                                                                                                    |
+| Live updates patch the cache instead of refetching          | The SSE stream carries the changed values (a stock level, a ticket status). The client writes them straight into the cached queries and only debounces a refetch for derived data such as report totals. Ten outlets selling at once do not cause a storm of requests.                                                                                                                       |
+| URL-driven dialogs, tabs and filters (`?item=`, `?tab=`)    | Reload, the back button and deep links work; the command palette can open a menu item directly.                                                                                                                                                                                                                                                                                              |
+| Optimistic updates where the server rarely says no          | Assigning items, price overrides and moving kitchen tickets feel instant; on an error the cache rolls back and a toast explains why.                                                                                                                                                                                                                                                         |
+| The POS sends an `Idempotency-Key` per cart                 | A double tap or a retry on a flaky connection can never charge twice. The key changes whenever the cart changes, so a different order is never mistaken for a retry.                                                                                                                                                                                                                         |
+| Accessible primitives (Base UI) styled with Tailwind tokens | Focus management, keyboard support and ARIA come from a maintained library; the look comes from one token file, so light and dark themes stay consistent.                                                                                                                                                                                                                                    |
+| Hand-written SVG charts instead of a chart library          | The dashboard needs one area chart (with the previous period dashed behind it) and KPI sparklines. Two small SVG components sharing one smoothing helper avoid a 100 kB+ dependency and use the design tokens directly.                                                                                                                                                                      |
+| Phones get lists, not tables                                | Below 1024 px, wide tables become lists: sales grouped by day, stock rows that expand to show details and actions, one card per menu item and stock change. Nothing scrolls sideways and touch targets are at least 40 px. On wide screens, table headers stay under the top bar while a long table scrolls, and every page shares one frame (up to 1920 px wide, same padding and spacing). |
+| One colour per outlet                                       | Each outlet keeps the same chart colour (by outlet code) in every bar, dot and legend, so it is recognisable across the dashboard, sales and outlet pages.                                                                                                                                                                                                                                   |
+| Route-level code splitting and vendor chunks                | The first load downloads only the shell and the current page. React, data and UI libraries sit in separate long-cached chunks, so a deploy usually invalidates only the app code.                                                                                                                                                                                                            |
+| Motion with purpose                                         | Animations explain a change (a new sale slides in, a figure counts to its new value, a chart line draws in, a ticket moves column) and stay short (150 ms for hover, 250 to 300 ms for panels, under a second for charts). They are disabled when the user prefers reduced motion.                                                                                                           |
 
 In production the API serves the built app from the same origin, so the session cookie is first-party and no CORS setup is needed. In development Vite proxies `/api` to the API for the same reason.
 
@@ -461,7 +511,7 @@ tablewise-hq/
         container.ts        composition root: wires modules through their ports
         app.ts              Express app (middleware, routes, docs, static web)
         main.ts             process entry: migrate, start relay and realtime, listen, graceful shutdown
-        cli/                migrate, seed, reset commands
+        cli/                migrate, seed, reset and replay-events commands
         seed/demo-data.ts   reproducible demo data through the real module APIs
       test/                 integration tests against PostgreSQL
     web/                    React 19 + Vite single-page app (see Frontend)
