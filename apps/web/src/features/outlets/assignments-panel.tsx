@@ -355,7 +355,7 @@ export function AssignmentsPanel({ outletId }: { outletId: string }) {
           {/* Phones and tablets: one card per item, with the price and on-sale switch in thumb reach. */}
           <ul className="divide-y divide-border/70 border-t lg:hidden">
             {rows.map((row) => (
-              <li key={row.item.id} className="grid gap-2.5 px-4 py-3">
+              <li key={row.item.id} className="grid grid-cols-[minmax(0,1fr)] gap-2.5 px-4 py-3">
                 <div className="flex items-start justify-between gap-3">
                   <div className="grid min-w-0 gap-0.5">
                     <span className="truncate text-sm font-medium">{row.item.name}</span>
