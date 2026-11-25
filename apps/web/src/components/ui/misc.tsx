@@ -59,9 +59,20 @@ function Tooltip({
   );
 }
 
-function Card({ className, ...props }: ComponentProps<"section">) {
+function Card({
+  className,
+  interactive = false,
+  ...props
+}: ComponentProps<"section"> & { interactive?: boolean }) {
   return (
-    <section className={cn("min-w-0 rounded-xl bg-card shadow-(--shadow-card)", className)} {...props} />
+    <section
+      className={cn(
+        "min-w-0 rounded-(--radius-card) bg-card shadow-(--shadow-card) transition-[box-shadow,translate,background-color] duration-(--motion-base) ease-(--ease-ui)",
+        interactive && "hover:-translate-y-0.5 hover:shadow-(--shadow-lift)",
+        className,
+      )}
+      {...props}
+    />
   );
 }
 
@@ -78,10 +89,10 @@ function CardHeader({
 }) {
   return (
     <header
-      className={cn("flex flex-wrap items-start justify-between gap-x-4 gap-y-3 px-5 pt-4 pb-3", className)}
+      className={cn("flex flex-wrap items-start justify-between gap-x-4 gap-y-3 px-5 pt-5 pb-3", className)}
     >
-      <div className="grid gap-0.5">
-        <h2 className="text-[0.9375rem] font-semibold tracking-tight">{title}</h2>
+      <div className="grid min-w-0 gap-0.5">
+        <h2 className="text-base font-semibold tracking-tight">{title}</h2>
         {description ? <p className="text-[0.8125rem] text-muted-foreground">{description}</p> : null}
       </div>
       {action}
@@ -103,7 +114,7 @@ function EmptyState({
   return (
     <div className={cn("flex flex-col items-center justify-center gap-2 px-6 py-12 text-center", className)}>
       {icon ? (
-        <div className="mb-1 grid size-10 place-items-center rounded-full bg-muted text-muted-foreground [&_svg]:size-5">
+        <div className="mb-1 grid size-12 place-items-center rounded-2xl bg-accent text-accent-foreground [&_svg]:size-5">
           {icon}
         </div>
       ) : null}

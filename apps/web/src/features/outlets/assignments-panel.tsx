@@ -81,9 +81,11 @@ function useAssignmentMutations(outletId: string) {
 function PriceCell({
   row,
   onSave,
+  className,
 }: {
   row: Row & { assignment: OutletAssignment };
   onSave: (minor: number | null) => void;
+  className?: string;
 }) {
   const current = row.assignment.priceOverrideMinor;
   const [value, setValue] = useState(current === null ? "" : minorToInput(current));
@@ -118,6 +120,7 @@ function PriceCell({
         className={cn(
           "num h-7 w-24 px-2 text-right text-[0.8125rem]",
           current !== null && "border-primary/50",
+          className,
         )}
       />
     </div>
@@ -309,15 +312,15 @@ export function AssignmentsPanel({ outletId }: { outletId: string }) {
         title="Menu and pricing"
         description={`${assignedCount} items on this outlet's menu, ${overrideCount} with an outlet price. Edit a price and press Enter; empty means base price.`}
         action={
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="relative">
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+            <div className="relative min-w-40 flex-1 sm:flex-none">
               <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
               <Input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Search"
                 aria-label="Search items"
-                className="h-(--control-h-sm) w-44 pl-8"
+                className="h-(--control-h-sm) w-full pl-8 sm:w-44"
               />
             </div>
             <Segmented
@@ -348,46 +351,24 @@ export function AssignmentsPanel({ outletId }: { outletId: string }) {
           {view === "assigned" ? "Switch to “Not assigned” and add items." : null}
         </EmptyState>
       ) : (
-        <Table>
-          <THead>
-            <TR>
-              <TH>Item</TH>
-              <TH>Category</TH>
-              <TH numeric>Base price</TH>
-              <TH numeric>Outlet price</TH>
-              <TH numeric>Stock</TH>
-              <TH>On sale</TH>
-              <TH className="text-right">Menu</TH>
-            </TR>
-          </THead>
-          <TBody>
+        <>
+          {/* Phones and tablets: one card per item, with the price and on-sale switch in thumb reach. */}
+          <ul className="divide-y divide-border/70 border-t lg:hidden">
             {rows.map((row) => (
-              <TR key={row.item.id}>
-                <TD>
-                  <div className="font-medium">{row.item.name}</div>
-                  <div className="font-mono text-[0.6875rem] text-muted-foreground">{row.item.sku}</div>
-                </TD>
-                <TD className="text-muted-foreground">{row.item.category}</TD>
-                <TD numeric className="text-muted-foreground">
-                  {formatMoney(row.item.basePriceMinor, { currency: false })}
-                </TD>
-                <TD numeric>
-                  {row.assignment ? (
-                    <PriceCell
-                      key={`${row.assignment.priceOverrideMinor}`}
-                      row={{ ...row, assignment: row.assignment }}
-                      onSave={(priceOverrideMinor) =>
-                        upsert.mutate({ menuItemId: row.item.id, body: { priceOverrideMinor } })
-                      }
-                    />
-                  ) : (
-                    <span className="text-muted-foreground">—</span>
-                  )}
-                </TD>
-                <TD numeric className={cn(row.stock?.isLow && "font-medium text-warning-foreground")}>
-                  {row.stock?.onHand ?? "—"}
-                </TD>
-                <TD>
+              <li key={row.item.id} className="grid gap-2.5 px-4 py-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="grid min-w-0 gap-0.5">
+                    <span className="truncate text-sm font-medium">{row.item.name}</span>
+                    <span className="truncate text-xs text-muted-foreground">
+                      {row.item.category} · <span className="font-mono">{row.item.sku}</span>
+                      {row.stock ? (
+                        <span className={cn(row.stock.isLow && "font-medium text-warning-foreground")}>
+                          {" "}
+                          · {row.stock.onHand} in stock
+                        </span>
+                      ) : null}
+                    </span>
+                  </div>
                   {row.assignment ? (
                     <Switch
                       checked={row.assignment.isAvailable}
@@ -395,30 +376,124 @@ export function AssignmentsPanel({ outletId }: { outletId: string }) {
                         upsert.mutate({ menuItemId: row.item.id, body: { isAvailable } })
                       }
                       aria-label={`${row.item.name} on sale`}
+                      className="mt-0.5 shrink-0 after:absolute after:-inset-3 after:content-['']"
                     />
-                  ) : null}
-                </TD>
-                <TD className="text-right">
-                  {row.assignment ? (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-muted-foreground hover:text-destructive"
-                      onClick={() => setRemoving(row)}
-                    >
-                      Remove
-                    </Button>
                   ) : (
-                    <Button variant="outline" size="sm" onClick={() => setAssigning(row.item)}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-10 shrink-0"
+                      onClick={() => setAssigning(row.item)}
+                    >
                       <Plus />
                       Assign
                     </Button>
                   )}
-                </TD>
-              </TR>
+                </div>
+                {row.assignment ? (
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="num text-xs text-muted-foreground">
+                      Base {formatMoney(row.item.basePriceMinor, { currency: false })}
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <PriceCell
+                        key={`${row.assignment.priceOverrideMinor}`}
+                        row={{ ...row, assignment: row.assignment }}
+                        onSave={(priceOverrideMinor) =>
+                          upsert.mutate({ menuItemId: row.item.id, body: { priceOverrideMinor } })
+                        }
+                        className="h-10 w-28"
+                      />
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-10 text-muted-foreground hover:text-destructive"
+                        onClick={() => setRemoving(row)}
+                      >
+                        Remove
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <span className="num text-xs text-muted-foreground">
+                    Base {formatMoney(row.item.basePriceMinor, { currency: false })}
+                  </span>
+                )}
+              </li>
             ))}
-          </TBody>
-        </Table>
+          </ul>
+          <Table stickyHeader className="hidden lg:table">
+            <THead>
+              <TR>
+                <TH>Item</TH>
+                <TH>Category</TH>
+                <TH numeric>Base price</TH>
+                <TH numeric>Outlet price</TH>
+                <TH numeric>Stock</TH>
+                <TH>On sale</TH>
+                <TH className="text-right">Menu</TH>
+              </TR>
+            </THead>
+            <TBody>
+              {rows.map((row) => (
+                <TR key={row.item.id}>
+                  <TD>
+                    <div className="font-medium">{row.item.name}</div>
+                    <div className="font-mono text-[0.6875rem] text-muted-foreground">{row.item.sku}</div>
+                  </TD>
+                  <TD className="text-muted-foreground">{row.item.category}</TD>
+                  <TD numeric className="text-muted-foreground">
+                    {formatMoney(row.item.basePriceMinor, { currency: false })}
+                  </TD>
+                  <TD numeric>
+                    {row.assignment ? (
+                      <PriceCell
+                        key={`${row.assignment.priceOverrideMinor}`}
+                        row={{ ...row, assignment: row.assignment }}
+                        onSave={(priceOverrideMinor) =>
+                          upsert.mutate({ menuItemId: row.item.id, body: { priceOverrideMinor } })
+                        }
+                      />
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </TD>
+                  <TD numeric className={cn(row.stock?.isLow && "font-medium text-warning-foreground")}>
+                    {row.stock?.onHand ?? "—"}
+                  </TD>
+                  <TD>
+                    {row.assignment ? (
+                      <Switch
+                        checked={row.assignment.isAvailable}
+                        onCheckedChange={(isAvailable) =>
+                          upsert.mutate({ menuItemId: row.item.id, body: { isAvailable } })
+                        }
+                        aria-label={`${row.item.name} on sale`}
+                      />
+                    ) : null}
+                  </TD>
+                  <TD className="text-right">
+                    {row.assignment ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-muted-foreground hover:text-destructive"
+                        onClick={() => setRemoving(row)}
+                      >
+                        Remove
+                      </Button>
+                    ) : (
+                      <Button variant="outline" size="sm" onClick={() => setAssigning(row.item)}>
+                        <Plus />
+                        Assign
+                      </Button>
+                    )}
+                  </TD>
+                </TR>
+              ))}
+            </TBody>
+          </Table>
+        </>
       )}
       {view !== "assigned" && !loading && rows.length > 0 ? (
         <footer className="flex flex-wrap items-center justify-between gap-3 border-t px-5 py-3 text-xs text-muted-foreground">
@@ -430,6 +505,7 @@ export function AssignmentsPanel({ outletId }: { outletId: string }) {
             <Button
               variant="outline"
               size="sm"
+              className="h-10 w-full sm:h-8 sm:w-auto"
               disabled={master.isFetchingNextPage}
               onClick={() => void master.fetchNextPage()}
             >

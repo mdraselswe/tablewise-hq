@@ -4,97 +4,118 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * "Calm operations": warm paper surfaces, ink text, one deep forest accent.
- * Colour carries meaning only (status, money up/down, the primary action), so a
- * busy screen stays readable. All colours are OKLCH so light and dark stay in step.
+ * Indigo on cool neutrals. Colour carries meaning: indigo for the primary action and
+ * selection, green, amber and red for status, and one fixed colour per chart series so
+ * a series reads the same in every chart. All colours are OKLCH so light and dark stay
+ * in step.
  */
 :root {
-  --background: oklch(0.982 0.004 85);
-  --foreground: oklch(0.22 0.012 70);
-  --card: oklch(0.996 0.002 85);
+  --background: oklch(0.975 0.002 286);
+  --foreground: oklch(0.205 0.01 285);
+  --card: oklch(1 0 0);
   --card-foreground: var(--foreground);
-  --popover: oklch(0.998 0.002 85);
+  --popover: oklch(1 0 0);
   --popover-foreground: var(--foreground);
-  --primary: oklch(0.43 0.072 160);
-  --primary-foreground: oklch(0.985 0.01 120);
-  --secondary: oklch(0.948 0.008 85);
-  --secondary-foreground: oklch(0.26 0.012 70);
-  --muted: oklch(0.955 0.006 85);
-  --muted-foreground: oklch(0.52 0.012 70);
-  --accent: oklch(0.94 0.014 150);
-  --accent-foreground: oklch(0.3 0.05 160);
-  --destructive: oklch(0.56 0.19 28);
-  --success: oklch(0.55 0.11 155);
-  --warning: oklch(0.72 0.14 75);
-  --warning-foreground: oklch(0.36 0.08 65);
-  --info: oklch(0.55 0.11 240);
-  --gold: oklch(0.78 0.11 85);
-  --border: oklch(0.905 0.008 85);
-  --input: oklch(0.88 0.01 85);
-  --ring: oklch(0.6 0.08 160);
-  --sidebar: oklch(0.965 0.006 85);
-  --chart-1: oklch(0.46 0.075 160);
-  --chart-2: oklch(0.7 0.1 85);
-  --chart-3: oklch(0.6 0.07 230);
-  --chart-4: oklch(0.62 0.09 30);
-  --chart-grid: oklch(0.92 0.006 85);
+  --primary: oklch(0.511 0.262 277);
+  --primary-foreground: oklch(0.99 0.005 277);
+  --secondary: oklch(0.958 0.004 286);
+  --secondary-foreground: oklch(0.25 0.01 285);
+  --muted: oklch(0.962 0.004 286);
+  --muted-foreground: oklch(0.51 0.014 286);
+  --accent: oklch(0.955 0.024 277);
+  --accent-foreground: oklch(0.457 0.24 277);
+  --destructive: oklch(0.577 0.245 27);
+  --success: oklch(0.527 0.137 150);
+  --warning: oklch(0.769 0.165 70);
+  --warning-foreground: oklch(0.52 0.13 62);
+  --info: oklch(0.588 0.158 242);
+  --gold: oklch(0.769 0.165 70);
+  --border: oklch(0.922 0.005 286);
+  --input: oklch(0.885 0.007 286);
+  --ring: oklch(0.585 0.233 277);
+  --sidebar: oklch(1 0 0);
+  --chart-1: oklch(0.585 0.233 277);
+  --chart-2: oklch(0.6 0.118 185);
+  --chart-3: oklch(0.666 0.179 58);
+  --chart-4: oklch(0.645 0.21 16);
+  --chart-grid: oklch(0.93 0.004 286);
 
   --radius: 0.625rem;
-  --shadow-sm: 0 1px 2px oklch(0.3 0.02 70 / 0.06);
-  --shadow-card: 0 1px 2px oklch(0.3 0.02 70 / 0.04), 0 0 0 1px oklch(0.3 0.02 70 / 0.05);
-  --shadow-overlay: 0 12px 32px -8px oklch(0.25 0.02 70 / 0.18), 0 2px 6px oklch(0.25 0.02 70 / 0.06);
+  --radius-card: 1rem;
+  --shadow-sm: 0 1px 2px oklch(0.2 0.01 286 / 0.06);
+  --shadow-card: 0 0 0 1px oklch(0.2 0.01 286 / 0.07), 0 1px 2px oklch(0.2 0.01 286 / 0.05);
+  --shadow-lift: 0 0 0 1px oklch(0.2 0.01 286 / 0.07), 0 10px 28px -10px oklch(0.2 0.02 286 / 0.22);
+  --shadow-overlay: 0 16px 40px -12px oklch(0.2 0.02 286 / 0.25), 0 0 0 1px oklch(0.2 0.01 286 / 0.07);
 
   /* Controls */
   --control-h: 2.25rem;
   --control-h-sm: 2rem;
   --control-h-lg: 2.75rem;
-  --control-px: 0.75rem;
+  --control-px: 0.875rem;
   --press-scale: 0.97;
 
   /* Motion: short and decelerating. Nothing bounces in an operations tool. */
-  --motion-fast: 140ms;
-  --motion-base: 220ms;
-  --motion-slow: 360ms;
-  --ease-ui: cubic-bezier(0.16, 1, 0.3, 1);
+  --motion-fast: 150ms;
+  --motion-base: 250ms;
+  --motion-slow: 380ms;
+  --ease-ui: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-press: cubic-bezier(0.25, 1, 0.5, 1);
+
+  /* Layout: the shell's bars, so full-height screens (POS, kitchen) can subtract them. */
+  --sidebar-w: 16rem;
+  --sidebar-w-collapsed: 4.75rem;
+  --shell-top: 3.5rem;
+  --shell-bottom: calc(4rem + env(safe-area-inset-bottom));
+  /* One page frame for every screen: the widest a page grows, and the space between its blocks. */
+  --page-max: 120rem;
+  --page-gap: 1rem;
+}
+
+@media (width >= 64rem) {
+  :root {
+    --shell-top: 4rem;
+    --shell-bottom: 0px;
+    --page-gap: 1.5rem;
+  }
 }
 
 .dark {
-  --background: oklch(0.17 0.008 70);
-  --foreground: oklch(0.94 0.006 85);
-  --card: oklch(0.205 0.008 70);
-  --popover: oklch(0.225 0.008 70);
-  --primary: oklch(0.74 0.1 158);
-  --primary-foreground: oklch(0.2 0.03 160);
-  --secondary: oklch(0.26 0.008 70);
-  --secondary-foreground: oklch(0.92 0.006 85);
-  --muted: oklch(0.24 0.008 70);
-  --muted-foreground: oklch(0.68 0.01 80);
-  --accent: oklch(0.28 0.03 160);
-  --accent-foreground: oklch(0.88 0.06 158);
-  --destructive: oklch(0.68 0.17 25);
-  --success: oklch(0.72 0.12 155);
-  --warning: oklch(0.8 0.13 80);
-  --warning-foreground: oklch(0.85 0.1 80);
-  --info: oklch(0.72 0.1 240);
-  --gold: oklch(0.8 0.11 85);
-  --border: oklch(0.3 0.008 70);
-  --input: oklch(0.34 0.01 70);
-  --ring: oklch(0.65 0.09 158);
-  --sidebar: oklch(0.19 0.008 70);
-  --chart-1: oklch(0.74 0.1 158);
-  --chart-2: oklch(0.78 0.1 85);
-  --chart-3: oklch(0.72 0.08 230);
-  --chart-4: oklch(0.7 0.1 30);
-  --chart-grid: oklch(0.27 0.008 70);
-  --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.3);
-  --shadow-card: 0 0 0 1px oklch(1 0 0 / 0.04);
-  --shadow-overlay: 0 16px 40px -8px oklch(0 0 0 / 0.6), 0 0 0 1px oklch(1 0 0 / 0.06);
+  --background: oklch(0.155 0.006 286);
+  --foreground: oklch(0.97 0.003 286);
+  --card: oklch(0.192 0.007 286);
+  --popover: oklch(0.222 0.009 286);
+  --primary: oklch(0.673 0.182 277);
+  --primary-foreground: oklch(0.17 0.03 277);
+  --secondary: oklch(0.25 0.01 286);
+  --secondary-foreground: oklch(0.93 0.004 286);
+  --muted: oklch(0.235 0.009 286);
+  --muted-foreground: oklch(0.71 0.012 286);
+  --accent: oklch(0.29 0.075 277);
+  --accent-foreground: oklch(0.81 0.1 275);
+  --destructive: oklch(0.704 0.191 22);
+  --success: oklch(0.792 0.18 152);
+  --warning: oklch(0.837 0.164 84);
+  --warning-foreground: oklch(0.86 0.14 84);
+  --info: oklch(0.746 0.16 233);
+  --gold: oklch(0.837 0.164 84);
+  --border: oklch(0.285 0.012 286);
+  --input: oklch(0.33 0.012 286);
+  --ring: oklch(0.673 0.182 277);
+  --sidebar: oklch(0.175 0.007 286);
+  --chart-1: oklch(0.673 0.182 277);
+  --chart-2: oklch(0.777 0.152 182);
+  --chart-3: oklch(0.837 0.164 84);
+  --chart-4: oklch(0.72 0.17 16);
+  --chart-grid: oklch(0.27 0.01 286);
+  --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.35);
+  --shadow-card: 0 0 0 1px oklch(1 0 0 / 0.06);
+  --shadow-lift: 0 0 0 1px oklch(1 0 0 / 0.09), 0 12px 32px -12px oklch(0 0 0 / 0.7);
+  --shadow-overlay: 0 16px 40px -8px oklch(0 0 0 / 0.65), 0 0 0 1px oklch(1 0 0 / 0.08);
 }
 
 @theme inline {
-  --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "Geist Mono Variable", ui-monospace, SFMono-Regular, monospace;
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, SFMono-Regular, monospace;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -129,7 +150,6 @@
   --radius-xl: calc(var(--radius) * 1.4);
   --radius-2xl: calc(var(--radius) * 1.8);
   --ease-ui: var(--ease-ui);
-  --animate-skeleton: skeleton-shimmer 1.6s ease-in-out infinite;
 }
 
 @layer base {

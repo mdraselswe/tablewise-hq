@@ -1,7 +1,16 @@
 import { MOVEMENT_WINDOW_DAYS, type StockLevel, type StockReason } from "@tablewise/contracts";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn } from "cn";
-import { ArrowDownRight, ArrowUpRight, History, PackagePlus, Search, SlidersHorizontal } from "lucide-react";
+import {
+  ArrowDownRight,
+  ArrowUpRight,
+  ChevronDown,
+  History,
+  PackagePlus,
+  Search,
+  SlidersHorizontal,
+} from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
 import { useDeferredValue, useMemo, useState } from "react";
 import { keys } from "@/api/keys.ts";
 import { assignmentsQuery, inventoryApi, movementsQuery, stockLevelsQuery } from "@/api/resources.ts";
@@ -36,7 +45,7 @@ function stockState(level: StockLevel): { tone: "success" | "warning" | "danger"
 }
 
 /** Inline editor for the low-stock alert level. Saves on blur or Enter. */
-function ThresholdInput({ level }: { level: StockLevel }) {
+function ThresholdInput({ level, className }: { level: StockLevel; className?: string }) {
   const queryClient = useQueryClient();
   const [value, setValue] = useState(String(level.lowStockThreshold));
   const save = useMutation({
@@ -61,7 +70,7 @@ function ThresholdInput({ level }: { level: StockLevel }) {
       onBlur={commit}
       onKeyDown={(event) => event.key === "Enter" && event.currentTarget.blur()}
       aria-label="Low-stock alert level"
-      className="h-7 w-16 px-2 text-right text-[0.8125rem]"
+      className={cn("h-7 w-16 px-2 text-right text-[0.8125rem]", className)}
     />
   );
 }
@@ -85,6 +94,102 @@ function StockBar({ level }: { level: StockLevel }) {
         style={{ width: `${width}%` }}
       />
     </div>
+  );
+}
+
+/**
+ * Phones and tablets: name and count only, tap a row for the details and actions. Seven columns
+ * would need sideways scrolling, and the count is what people check on the floor.
+ */
+function StockList({ rows, onOpen }: { rows: Row[]; onOpen: (row: Row, mode: AdjustMode) => void }) {
+  const [expanded, setExpanded] = useState<string | null>(null);
+  return (
+    <ul className="divide-y divide-border/70 border-t lg:hidden">
+      {rows.map((row) => {
+        const id = row.level.menuItemId;
+        const state = stockState(row.level);
+        const isOpen = expanded === id;
+        return (
+          <li key={id}>
+            <button
+              type="button"
+              aria-expanded={isOpen}
+              aria-controls={`stock-${id}`}
+              onClick={() => setExpanded(isOpen ? null : id)}
+              className="flex min-h-14 w-full items-center gap-3 px-4 py-3 text-left transition-colors outline-none focus-visible:bg-muted/60 active:bg-muted"
+            >
+              <div className="grid min-w-0 flex-1 gap-0.5">
+                <span className="truncate text-sm font-medium">{row.name}</span>
+                <span className="text-xs text-muted-foreground">
+                  <StatusDot tone={state.tone}>{state.label}</StatusDot>
+                </span>
+              </div>
+              <span
+                className={cn(
+                  "num shrink-0 text-lg font-semibold",
+                  row.level.onHand === 0 && "text-destructive",
+                )}
+              >
+                <FlashOnChange value={row.level.onHand}>{row.level.onHand}</FlashOnChange>
+              </span>
+              <ChevronDown
+                className={cn(
+                  "size-4 shrink-0 text-muted-foreground transition-transform duration-(--motion-base) ease-(--ease-ui)",
+                  isOpen && "rotate-180",
+                )}
+                aria-hidden="true"
+              />
+            </button>
+            <AnimatePresence initial={false}>
+              {isOpen ? (
+                <motion.div
+                  id={`stock-${id}`}
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+                  className="overflow-hidden"
+                >
+                  <div className="grid gap-3 px-4 pb-4">
+                    <dl className="grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-2.5 rounded-lg bg-muted/50 p-3 text-[0.8125rem]">
+                      <dt className="text-muted-foreground">SKU</dt>
+                      <dd className="truncate text-right font-mono text-xs">{row.sku || "—"}</dd>
+                      <dt className="text-muted-foreground">Category</dt>
+                      <dd className="truncate text-right">{row.category || "—"}</dd>
+                      <dt className="text-muted-foreground">Level</dt>
+                      <dd className="flex justify-end">
+                        <StockBar level={row.level} />
+                      </dd>
+                      <dt className="text-muted-foreground">Alert below</dt>
+                      <dd className="flex justify-end">
+                        <ThresholdInput
+                          key={row.level.lowStockThreshold}
+                          level={row.level}
+                          className="h-9 w-20"
+                        />
+                      </dd>
+                    </dl>
+                    {!row.available ? (
+                      <p className="text-xs text-muted-foreground">Not on sale at the counter right now.</p>
+                    ) : null}
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button className="h-11" onClick={() => onOpen(row, "RESTOCK")}>
+                        <PackagePlus />
+                        Restock
+                      </Button>
+                      <Button variant="outline" className="h-11" onClick={() => onOpen(row, "ADJUSTMENT")}>
+                        <SlidersHorizontal />
+                        Count or waste
+                      </Button>
+                    </div>
+                  </div>
+                </motion.div>
+              ) : null}
+            </AnimatePresence>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
@@ -136,14 +241,14 @@ function MovementsCard({
         title="Audit trail"
         description="Every change to stock: who, when, why, and the balance after."
         action={
-          <div className="flex flex-wrap gap-2">
+          <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap">
             <Select
               aria-label="Item"
               size="sm"
               value={menuItemId}
               onValueChange={setMenuItemId}
               options={itemOptions}
-              className="w-44"
+              className="col-span-2 w-full sm:w-44"
             />
             <Select
               aria-label="Reason"
@@ -157,7 +262,7 @@ function MovementsCard({
                   label,
                 })),
               ]}
-              className="w-40"
+              className="w-full sm:w-40"
             />
             <Select
               aria-label="Period"
@@ -168,7 +273,7 @@ function MovementsCard({
                 value: String(value),
                 label: value === 365 ? "Last year" : `Last ${value} days`,
               }))}
-              className="w-36"
+              className="w-full sm:w-36"
             />
           </div>
         }
@@ -185,7 +290,44 @@ function MovementsCard({
         </EmptyState>
       ) : (
         <>
-          <Table>
+          <ul
+            className={cn(
+              "divide-y divide-border/70 border-t lg:hidden",
+              movements.isPlaceholderData && "opacity-60 transition-opacity",
+            )}
+          >
+            {movements.data?.items.map((movement) => (
+              <li key={movement.id} className="grid gap-1.5 px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="truncate text-sm font-medium">
+                    {rows.get(movement.menuItemId)?.name ?? "Removed item"}
+                  </span>
+                  <span
+                    className={cn(
+                      "num shrink-0 text-sm font-semibold",
+                      movement.delta > 0 ? "text-success" : "text-foreground",
+                    )}
+                  >
+                    {movement.delta > 0 ? `+${movement.delta}` : movement.delta}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
+                  <span className="flex min-w-0 items-center gap-2">
+                    <Badge tone={REASON_TONE[movement.reason]}>{STOCK_REASON_LABELS[movement.reason]}</Badge>
+                    <span className="truncate">
+                      {movement.actorName ?? (movement.reason === "SALE" ? "Till" : "System")} ·{" "}
+                      {formatDateTime(movement.createdAt, timeZone)}
+                    </span>
+                  </span>
+                  <span className="num shrink-0">Bal. {movement.balanceAfter}</span>
+                </div>
+                {movement.note ? (
+                  <p className="truncate text-xs text-muted-foreground">{movement.note}</p>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+          <Table stickyHeader className="hidden lg:table">
             <THead>
               <TR>
                 <TH>When</TH>
@@ -229,18 +371,25 @@ function MovementsCard({
               ))}
             </TBody>
           </Table>
-          <footer className="flex items-center justify-between border-t px-5 py-3 text-xs text-muted-foreground">
+          <footer className="flex flex-wrap items-center justify-between gap-3 border-t px-5 py-3 text-xs text-muted-foreground">
             <span className="num">
               {firstRow}–{lastRow} of{" "}
               {formatTotal(movements.data?.total ?? 0, movements.data?.totalCapped ?? false)} changes
             </span>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" disabled={!pager.hasPrevious} onClick={pager.previous}>
+            <div className="flex w-full gap-2 sm:w-auto">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-10 flex-1 sm:h-8 sm:flex-none"
+                disabled={!pager.hasPrevious}
+                onClick={pager.previous}
+              >
                 Newer
               </Button>
               <Button
                 variant="outline"
                 size="sm"
+                className="h-10 flex-1 sm:h-8 sm:flex-none"
                 disabled={!movements.data?.nextCursor}
                 onClick={() => {
                   if (movements.data?.nextCursor) pager.next(movements.data.nextCursor);
@@ -317,21 +466,21 @@ export function InventoryPanel({
   const open = (row: Row, mode: AdjustMode) => setTarget({ level: row.level, itemName: row.name, mode });
 
   return (
-    <div className="grid gap-6">
+    <div className="grid gap-(--page-gap)">
       <Card>
         <CardHeader
           title="Stock on hand"
           description="Sales deduct stock automatically. It can never go below zero."
           action={
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="relative">
+            <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+              <div className="relative min-w-40 flex-1 sm:flex-none">
                 <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
                   placeholder="Search"
                   aria-label="Search stock"
-                  className="h-(--control-h-sm) w-44 pl-8"
+                  className="h-(--control-h-sm) w-full pl-8 sm:w-44"
                 />
               </div>
               <Segmented
@@ -364,68 +513,71 @@ export function InventoryPanel({
               : "Try another filter."}
           </EmptyState>
         ) : (
-          <Table>
-            <THead>
-              <TR>
-                <TH>Item</TH>
-                <TH>Category</TH>
-                <TH numeric>On hand</TH>
-                <TH>Level</TH>
-                <TH>Status</TH>
-                <TH numeric>Alert below</TH>
-                <TH className="text-right">Actions</TH>
-              </TR>
-            </THead>
-            <TBody>
-              {visible.map((row) => {
-                const state = stockState(row.level);
-                return (
-                  <TR key={row.level.menuItemId}>
-                    <TD>
-                      <div className="font-medium">{row.name}</div>
-                      <div className="text-[0.6875rem] text-muted-foreground">
-                        {row.sku}
-                        {!row.available ? " · not on sale" : ""}
-                      </div>
-                    </TD>
-                    <TD className="text-muted-foreground">{row.category}</TD>
-                    <TD numeric className="text-[0.9375rem] font-semibold">
-                      <FlashOnChange value={row.level.onHand}>{row.level.onHand}</FlashOnChange>
-                    </TD>
-                    <TD>
-                      <StockBar level={row.level} />
-                    </TD>
-                    <TD>
-                      <StatusDot tone={state.tone}>{state.label}</StatusDot>
-                    </TD>
-                    <TD numeric>
-                      <div className="flex justify-end">
-                        <ThresholdInput key={row.level.lowStockThreshold} level={row.level} />
-                      </div>
-                    </TD>
-                    <TD>
-                      <div className="flex justify-end gap-1">
-                        <Button variant="outline" size="sm" onClick={() => open(row, "RESTOCK")}>
-                          <PackagePlus />
-                          Restock
-                        </Button>
-                        <Tooltip content="Count or write off">
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            onClick={() => open(row, "ADJUSTMENT")}
-                            aria-label={`Adjust ${row.name}`}
-                          >
-                            <SlidersHorizontal />
+          <>
+            <StockList rows={visible} onOpen={open} />
+            <Table stickyHeader className="hidden lg:table">
+              <THead>
+                <TR>
+                  <TH>Item</TH>
+                  <TH>Category</TH>
+                  <TH numeric>On hand</TH>
+                  <TH>Level</TH>
+                  <TH>Status</TH>
+                  <TH numeric>Alert below</TH>
+                  <TH className="text-right">Actions</TH>
+                </TR>
+              </THead>
+              <TBody>
+                {visible.map((row) => {
+                  const state = stockState(row.level);
+                  return (
+                    <TR key={row.level.menuItemId}>
+                      <TD>
+                        <div className="font-medium">{row.name}</div>
+                        <div className="text-[0.6875rem] text-muted-foreground">
+                          {row.sku}
+                          {!row.available ? " · not on sale" : ""}
+                        </div>
+                      </TD>
+                      <TD className="text-muted-foreground">{row.category}</TD>
+                      <TD numeric className="text-[0.9375rem] font-semibold">
+                        <FlashOnChange value={row.level.onHand}>{row.level.onHand}</FlashOnChange>
+                      </TD>
+                      <TD>
+                        <StockBar level={row.level} />
+                      </TD>
+                      <TD>
+                        <StatusDot tone={state.tone}>{state.label}</StatusDot>
+                      </TD>
+                      <TD numeric>
+                        <div className="flex justify-end">
+                          <ThresholdInput key={row.level.lowStockThreshold} level={row.level} />
+                        </div>
+                      </TD>
+                      <TD>
+                        <div className="flex justify-end gap-1">
+                          <Button variant="outline" size="sm" onClick={() => open(row, "RESTOCK")}>
+                            <PackagePlus />
+                            Restock
                           </Button>
-                        </Tooltip>
-                      </div>
-                    </TD>
-                  </TR>
-                );
-              })}
-            </TBody>
-          </Table>
+                          <Tooltip content="Count or write off">
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              onClick={() => open(row, "ADJUSTMENT")}
+                              aria-label={`Adjust ${row.name}`}
+                            >
+                              <SlidersHorizontal />
+                            </Button>
+                          </Tooltip>
+                        </div>
+                      </TD>
+                    </TR>
+                  );
+                })}
+              </TBody>
+            </Table>
+          </>
         )}
       </Card>
 

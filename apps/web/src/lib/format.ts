@@ -95,10 +95,14 @@ export function formatRelative(iso: string, now = Date.now()): string {
   return relative.format(Math.round(hours / 24), "day");
 }
 
-/** Minutes and seconds since `iso`, for kitchen timers: "4:07". */
+/**
+ * Time since `iso`, for kitchen timers: "4:07" under an hour, then "2h 05m", because a
+ * ticket forgotten overnight read as "732:16".
+ */
 export function formatElapsed(iso: string, now = Date.now()): string {
   const total = Math.max(0, Math.floor((now - Date.parse(iso)) / 1000));
   const minutes = Math.floor(total / 60);
+  if (minutes >= 60) return `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, "0")}m`;
   const seconds = total % 60;
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }

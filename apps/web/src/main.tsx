@@ -1,8 +1,9 @@
-import "@fontsource-variable/geist";
-import "@fontsource-variable/geist-mono";
+import "@fontsource-variable/inter";
+import "@fontsource-variable/jetbrains-mono";
 import "./styles/globals.css";
 
 import { MutationCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MotionConfig } from "motion/react";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { RouterProvider } from "react-router";
@@ -42,7 +43,10 @@ createRoot(root).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <TooltipProvider delay={300}>
-        <RouterProvider router={router} />
+        {/* JS-driven motion (slides, scales, layout moves) follows the OS setting like the CSS does. */}
+        <MotionConfig reducedMotion="user">
+          <RouterProvider router={router} />
+        </MotionConfig>
         <Toaster />
       </TooltipProvider>
     </QueryClientProvider>

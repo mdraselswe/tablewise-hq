@@ -3,7 +3,7 @@ import { ArrowLeft, Boxes, MapPin, Pencil, ReceiptText, UtensilsCrossed } from "
 import { useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 import { outletsQuery, revenueQuery } from "@/api/resources.ts";
-import { Page } from "@/components/layout/page.tsx";
+import { Page, PAGE_FRAME } from "@/components/layout/page.tsx";
 import { Badge, StatusDot } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { buttonVariants } from "@/components/ui/button-variants.ts";
@@ -11,6 +11,7 @@ import { Card, EmptyState, FlashOnChange, Skeleton } from "@/components/ui/misc.
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
 import { NotFoundPage } from "@/app/error-pages.tsx";
 import { InventoryPanel } from "@/features/inventory/inventory-panel.tsx";
+import { useOutletColors } from "@/hooks/use-outlet-colors.ts";
 import { rangeFor } from "@/lib/date-range.ts";
 import { formatCount, formatMoney } from "@/lib/format.ts";
 import { AssignmentsPanel } from "./assignments-panel.tsx";
@@ -19,14 +20,34 @@ import { OutletDialog } from "./outlet-dialog.tsx";
 const TABS = ["menu", "inventory"] as const;
 type Tab = (typeof TABS)[number];
 
-function Stat({ label, value, sub }: { label: string; value: string; sub: string }) {
+function Stat({
+  label,
+  value,
+  sub,
+  pending,
+}: {
+  label: string;
+  value: string;
+  sub: string;
+  pending: boolean;
+}) {
   return (
-    <Card className="px-5 py-4">
-      <div className="text-xs text-muted-foreground">{label}</div>
-      <div className="num mt-1 text-xl font-semibold tracking-tight">
-        <FlashOnChange value={value}>{value}</FlashOnChange>
-      </div>
-      <div className="num text-xs text-muted-foreground">{sub}</div>
+    <Card className="min-w-0 px-4 py-4 sm:px-5">
+      <div className="truncate text-xs text-muted-foreground">{label}</div>
+      {/* A skeleton while loading: a "BDT 0" placeholder reads as a real figure. */}
+      {pending ? (
+        <>
+          <Skeleton className="mt-1.5 h-6 w-24" />
+          <Skeleton className="mt-1.5 h-3.5 w-16" />
+        </>
+      ) : (
+        <>
+          <div className="num mt-1 truncate text-lg font-semibold tracking-tight sm:text-xl">
+            <FlashOnChange value={value}>{value}</FlashOnChange>
+          </div>
+          <div className="num truncate text-xs text-muted-foreground">{sub}</div>
+        </>
+      )}
     </Card>
   );
 }
@@ -37,15 +58,16 @@ export default function OutletDetailPage() {
   const tab: Tab = TABS.includes(params.get("tab") as Tab) ? (params.get("tab") as Tab) : "menu";
   const [editing, setEditing] = useState(false);
   const outlets = useQuery(outletsQuery);
+  const colorOf = useOutletColors();
   const outlet = outlets.data?.find((candidate) => candidate.id === outletId);
   const today = useQuery({ ...revenueQuery({ ...rangeFor("today"), outletId }), enabled: Boolean(outlet) });
   const week = useQuery({ ...revenueQuery({ ...rangeFor("7d"), outletId }), enabled: Boolean(outlet) });
 
   if (outlets.isPending) {
     return (
-      <div className="mx-auto max-w-7xl px-8 py-8">
+      <div className={PAGE_FRAME}>
         <Skeleton className="h-8 w-64" />
-        <Skeleton className="mt-8 h-96 rounded-xl" />
+        <Skeleton className="mt-8 h-96 rounded-(--radius-card)" />
       </div>
     );
   }
@@ -57,8 +79,13 @@ export default function OutletDetailPage() {
   return (
     <Page
       title={
-        <span className="flex items-center gap-3">
-          {outlet.name}
+        <span className="flex min-w-0 items-center gap-3">
+          <span
+            className="size-3 shrink-0 rounded-[4px]"
+            style={{ background: colorOf(outlet.id) }}
+            aria-hidden="true"
+          />
+          <span className="truncate">{outlet.name}</span>
           <Badge tone="outline" className="font-mono text-xs">
             {outlet.code}
           </Badge>
@@ -90,31 +117,35 @@ export default function OutletDetailPage() {
         </>
       }
     >
-      <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-(--page-gap) lg:grid-cols-4">
         <Stat
           label="Revenue today"
+          pending={today.isPending}
           value={formatMoney(t?.revenueMinor ?? 0, { whole: true })}
           sub={`${formatCount(t?.saleCount ?? 0)} sales`}
         />
         <Stat
           label="Average ticket today"
+          pending={today.isPending}
           value={formatMoney(t?.averageTicketMinor ?? 0, { whole: true })}
           sub={`${formatCount(t?.itemsSold ?? 0)} items sold`}
         />
         <Stat
           label="Revenue, 7 days"
+          pending={week.isPending}
           value={formatMoney(w?.revenueMinor ?? 0, { whole: true })}
           sub={`${formatCount(w?.saleCount ?? 0)} sales`}
         />
         <Stat
           label="Average ticket, 7 days"
+          pending={week.isPending}
           value={formatMoney(w?.averageTicketMinor ?? 0, { whole: true })}
           sub={`${formatCount(w?.itemsSold ?? 0)} items sold`}
         />
       </div>
 
       {!outlet.isActive ? (
-        <Card className="mb-6">
+        <Card>
           <EmptyState title="This outlet is closed" className="py-6">
             Its tills reject new sales. Open it again from Edit outlet.
           </EmptyState>

@@ -4,6 +4,7 @@ import { cn } from "cn";
 import {
   Banknote,
   CheckCircle2,
+  ChevronUp,
   CreditCard,
   Minus,
   Plus,
@@ -157,10 +158,11 @@ function CartLineRow({
         {formatMoney(line.item.priceMinor * line.quantity, { currency: false })}
       </div>
       <div className="col-span-2 flex items-center justify-between">
-        <div className="inline-flex items-center rounded-md border bg-background">
+        <div className="inline-flex items-center rounded-lg border bg-background">
           <Button
             variant="ghost"
             size="icon-xs"
+            className="size-10 lg:size-6"
             onClick={() => onSet(line.quantity - 1)}
             aria-label={`One less ${line.item.name}`}
           >
@@ -172,6 +174,7 @@ function CartLineRow({
           <Button
             variant="ghost"
             size="icon-xs"
+            className="size-10 lg:size-6"
             onClick={() => onSet(line.quantity + 1)}
             aria-label={`One more ${line.item.name}`}
           >
@@ -183,7 +186,8 @@ function CartLineRow({
           size="icon-xs"
           onClick={onRemove}
           aria-label={`Remove ${line.item.name}`}
-          className="text-muted-foreground opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+          // Hidden until hover only where there is a pointer to hover with.
+          className="size-10 text-muted-foreground lg:size-6 lg:opacity-0 lg:group-hover:opacity-100 lg:focus-visible:opacity-100"
         >
           <X />
         </Button>
@@ -212,6 +216,10 @@ export default function PosPage() {
   const deferredSearch = useDeferredValue(search);
   const [issues, setIssues] = useState<Map<string, string>>(new Map());
   const [receipt, setReceipt] = useState<{ sale: Sale; replayed: boolean } | null>(null);
+  // Phones only: the order opens as a sheet over the menu from the ticket bar.
+  const [ticketOpen, setTicketOpen] = useState(false);
+  // An emptied cart (Clear, or removing the last line) has nothing left to review.
+  const sheetOpen = ticketOpen && cart.lines.length > 0;
   const searchRef = useRef<HTMLInputElement>(null);
 
   const stockById = useMemo(
@@ -267,6 +275,7 @@ export default function PosPage() {
       );
       setIssues(new Map());
       setReceipt(result);
+      setTicketOpen(false);
       cart.clear();
     },
     onError: (error) => {
@@ -303,8 +312,15 @@ export default function PosPage() {
 
   const canCharge = cart.lines.length > 0 && !charge.isPending;
 
+  useEffect(() => {
+    if (!sheetOpen) return;
+    const onKey = (event: KeyboardEvent) => event.key === "Escape" && setTicketOpen(false);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [sheetOpen]);
+
   return (
-    <div className="grid h-[calc(100dvh-3.5rem)] grid-cols-1 grid-rows-[minmax(0,1fr)_auto] lg:h-dvh lg:grid-cols-[minmax(0,1fr)_380px] lg:grid-rows-1">
+    <div className="grid h-[calc(100dvh-var(--shell-top)-var(--shell-bottom))] grid-cols-1 grid-rows-[minmax(0,1fr)_auto] lg:grid-cols-[minmax(0,1fr)_380px] lg:grid-rows-1">
       {/* Catalog */}
       <section aria-label="Menu" className="flex min-h-0 min-w-0 flex-col">
         <div className="space-y-3 border-b px-4 pt-5 pb-3 sm:px-6">
@@ -329,7 +345,7 @@ export default function PosPage() {
             </div>
           </div>
           <div
-            className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-0.5"
+            className="-mx-1 flex [scrollbar-width:none] gap-1.5 overflow-x-auto px-1 pb-0.5 [&::-webkit-scrollbar]:hidden"
             role="tablist"
             aria-label="Categories"
           >
@@ -343,7 +359,7 @@ export default function PosPage() {
                 className={cn(
                   "h-8 shrink-0 rounded-full border px-3.5 text-[0.8125rem] font-medium transition-colors duration-(--motion-fast)",
                   category === name
-                    ? "border-foreground bg-foreground text-background"
+                    ? "border-primary bg-primary text-primary-foreground"
                     : "bg-card text-muted-foreground hover:text-foreground",
                 )}
               >
@@ -372,6 +388,8 @@ export default function PosPage() {
                   stock={stockById.get(item.menuItemId)}
                   inCart={cart.quantities.get(item.menuItemId) ?? 0}
                   onAdd={() => {
+                    // A sheet left "open" by emptying the cart must not pop up with the first new item.
+                    if (cart.lines.length === 0) setTicketOpen(false);
                     cart.add(item);
                     setIssues((current) => {
                       if (!current.has(item.menuItemId)) return current;
@@ -387,11 +405,8 @@ export default function PosPage() {
         </div>
       </section>
 
-      {/* Cart */}
-      <aside
-        aria-label="Current order"
-        className="flex max-h-[45dvh] min-h-0 flex-col border-t bg-card lg:max-h-none lg:border-t-0 lg:border-l"
-      >
+      {/* Cart: a side column on wide screens. */}
+      <aside aria-label="Current order" className="hidden min-h-0 flex-col border-l bg-card lg:flex">
         <div className="flex items-center justify-between border-b px-5 py-4">
           <div>
             <h2 className="text-[0.9375rem] font-semibold">Current order</h2>
@@ -399,12 +414,23 @@ export default function PosPage() {
               {cart.itemCount} {cart.itemCount === 1 ? "item" : "items"}
             </p>
           </div>
-          {cart.lines.length > 0 ? (
-            <Button variant="ghost" size="sm" onClick={cart.clear} className="text-muted-foreground">
-              <Trash2 />
-              Clear
+          <div className="flex items-center gap-1">
+            {cart.lines.length > 0 ? (
+              <Button variant="ghost" size="sm" onClick={cart.clear} className="text-muted-foreground">
+                <Trash2 />
+                Clear
+              </Button>
+            ) : null}
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="lg:hidden"
+              onClick={() => setTicketOpen(false)}
+              aria-label="Back to the menu"
+            >
+              <X />
             </Button>
-          ) : null}
+          </div>
         </div>
         <div className="flex-1 overflow-y-auto px-5">
           {cart.lines.length === 0 ? (
@@ -458,6 +484,141 @@ export default function PosPage() {
           </Button>
         </div>
       </aside>
+
+      {/* Phones: a ticket bar that is always in reach, opening the order as a sheet. */}
+      <div className="border-t bg-card px-4 py-3 lg:hidden">
+        <button
+          type="button"
+          onClick={() => setTicketOpen(true)}
+          disabled={cart.lines.length === 0}
+          aria-expanded={sheetOpen}
+          className="flex h-12 w-full items-center gap-3 rounded-xl bg-primary px-4 text-primary-foreground shadow-(--shadow-sm) transition-[opacity,scale] duration-(--motion-fast) active:scale-[0.99] disabled:bg-muted disabled:text-muted-foreground disabled:shadow-none"
+        >
+          <motion.span
+            key={cart.itemCount}
+            initial={{ scale: 0.7 }}
+            animate={{ scale: 1 }}
+            transition={{ type: "spring", stiffness: 600, damping: 22 }}
+            className="num grid h-7 min-w-7 place-items-center rounded-full bg-primary-foreground/20 px-1.5 text-xs font-semibold"
+          >
+            {cart.itemCount}
+          </motion.span>
+          <span className="flex-1 text-left text-sm font-medium">
+            {cart.lines.length === 0 ? "Tap items to start an order" : "Review order"}
+          </span>
+          {cart.lines.length > 0 ? (
+            <>
+              <span className="num text-[0.9375rem] font-semibold">{formatMoney(cart.totalMinor)}</span>
+              <ChevronUp className="size-4" aria-hidden="true" />
+            </>
+          ) : null}
+        </button>
+      </div>
+      <AnimatePresence>
+        {sheetOpen ? (
+          <>
+            <motion.div
+              key="ticket-backdrop"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="fixed inset-x-0 top-0 bottom-(--shell-bottom) z-30 bg-black/40 lg:hidden"
+              onClick={() => setTicketOpen(false)}
+              aria-hidden="true"
+            />
+            <motion.aside
+              key="ticket-sheet"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Current order"
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+              className="fixed inset-x-0 bottom-(--shell-bottom) z-30 flex max-h-[calc(100dvh-var(--shell-bottom)-2rem)] flex-col rounded-t-2xl bg-card shadow-(--shadow-overlay) lg:hidden"
+            >
+              <span className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-border" aria-hidden="true" />
+              <div className="flex items-center justify-between border-b px-5 py-4">
+                <div>
+                  <h2 className="text-[0.9375rem] font-semibold">Current order</h2>
+                  <p className="num text-xs text-muted-foreground">
+                    {cart.itemCount} {cart.itemCount === 1 ? "item" : "items"}
+                  </p>
+                </div>
+                <div className="flex items-center gap-1">
+                  {cart.lines.length > 0 ? (
+                    <Button variant="ghost" size="sm" onClick={cart.clear} className="text-muted-foreground">
+                      <Trash2 />
+                      Clear
+                    </Button>
+                  ) : null}
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className="lg:hidden"
+                    onClick={() => setTicketOpen(false)}
+                    aria-label="Back to the menu"
+                  >
+                    <X />
+                  </Button>
+                </div>
+              </div>
+              <div className="flex-1 overflow-y-auto px-5">
+                {cart.lines.length === 0 ? (
+                  <EmptyState icon={<ShoppingBasket />} title="No items yet" className="h-full">
+                    Tap an item to add it to the order.
+                  </EmptyState>
+                ) : (
+                  <ul className="divide-y">
+                    <AnimatePresence initial={false}>
+                      {cart.lines.map((line) => (
+                        <CartLineRow
+                          key={line.item.menuItemId}
+                          line={line}
+                          issue={issues.get(line.item.menuItemId)}
+                          onSet={(quantity) => cart.setQuantity(line.item.menuItemId, quantity)}
+                          onRemove={() => cart.remove(line.item.menuItemId)}
+                        />
+                      ))}
+                    </AnimatePresence>
+                  </ul>
+                )}
+              </div>
+              <div className="space-y-4 border-t bg-background/40 px-5 py-4">
+                <div className="flex items-baseline justify-between">
+                  <span className="text-sm text-muted-foreground">Total</span>
+                  <motion.span
+                    key={cart.totalMinor}
+                    initial={{ opacity: 0.4, y: -3 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="num text-2xl font-semibold tracking-tight"
+                  >
+                    {formatMoney(cart.totalMinor)}
+                  </motion.span>
+                </div>
+                <Segmented
+                  aria-label="Payment method"
+                  value={payment}
+                  onChange={setPayment}
+                  options={PAYMENT_OPTIONS}
+                  size="lg"
+                  className="flex w-full"
+                />
+                <Button
+                  size="lg"
+                  className="h-12 w-full text-[0.9375rem]"
+                  disabled={!canCharge}
+                  pending={charge.isPending}
+                  onClick={() => charge.mutate()}
+                >
+                  {cart.lines.length === 0 ? "Add items to charge" : `Charge ${formatMoney(cart.totalMinor)}`}
+                </Button>
+              </div>
+            </motion.aside>
+          </>
+        ) : null}
+      </AnimatePresence>
 
       <Dialog open={receipt !== null} onOpenChange={(open) => !open && setReceipt(null)}>
         <DialogContent className="sm:max-w-sm">

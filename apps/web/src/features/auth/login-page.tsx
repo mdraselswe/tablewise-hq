@@ -48,33 +48,38 @@ export function LoginPage() {
 
   return (
     <div className="grid min-h-dvh lg:grid-cols-[1fr_minmax(0,520px)]">
-      <aside className="relative hidden overflow-hidden bg-primary text-primary-foreground lg:flex lg:flex-col lg:justify-between lg:p-12">
-        <Wordmark className="[&_rect]:fill-primary-foreground/12" />
+      {/* A light panel with a brand glow: a full-bleed colour block outweighed the form. */}
+      <aside className="relative hidden overflow-hidden border-r bg-card lg:flex lg:flex-col lg:justify-between lg:p-12">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_50%_at_0%_0%,color-mix(in_oklch,var(--primary)_14%,transparent),transparent_70%),radial-gradient(50%_40%_at_100%_100%,color-mix(in_oklch,var(--chart-2)_10%,transparent),transparent_70%)]"
+        />
+        <Wordmark className="relative z-10" />
         <div className="relative z-10 max-w-md">
           <h1 className="text-3xl leading-tight font-semibold tracking-tight text-balance">
             One menu. Every outlet. Stock you can trust.
           </h1>
-          <p className="mt-4 text-[0.9375rem] leading-relaxed text-primary-foreground/75">
+          <p className="mt-4 text-[0.9375rem] leading-relaxed text-muted-foreground">
             Set prices once at HQ, sell at the counter, cook from the kitchen display and watch revenue arrive
             as it happens.
           </p>
         </div>
-        <dl className="relative z-10 grid grid-cols-3 gap-6 border-t border-primary-foreground/15 pt-6 text-sm">
+        <dl className="relative z-10 grid grid-cols-3 gap-6 border-t pt-6 text-sm">
           {[
             ["Gap-free", "receipt numbers per outlet"],
             ["Zero", "oversold items, by constraint"],
             ["Live", "sales and kitchen updates"],
           ].map(([value, label]) => (
             <div key={value}>
-              <dt className="text-lg font-semibold">{value}</dt>
-              <dd className="mt-0.5 text-primary-foreground/65">{label}</dd>
+              <dt className="text-lg font-semibold text-primary">{value}</dt>
+              <dd className="mt-0.5 text-muted-foreground">{label}</dd>
             </div>
           ))}
         </dl>
         {/* Quiet texture: concentric "plates". */}
         <svg
           aria-hidden="true"
-          className="absolute -right-40 -bottom-40 size-[640px] opacity-[0.08]"
+          className="absolute -right-40 -bottom-40 size-[640px] text-primary opacity-[0.12]"
           viewBox="0 0 100 100"
         >
           {[48, 38, 28, 18].map((r) => (
@@ -87,7 +92,7 @@ export function LoginPage() {
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+          transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
           className="w-full max-w-sm"
         >
           <Wordmark className="mb-10 lg:hidden" />
@@ -158,14 +163,14 @@ export function LoginPage() {
                       setPassword(DEMO_PASSWORD);
                       login.mutate({ email: account.email, password: DEMO_PASSWORD });
                     }}
-                    className="group flex w-full items-center gap-3 rounded-lg border bg-card px-3 py-2.5 text-left shadow-(--shadow-sm) transition-[border-color,translate] duration-(--motion-fast) hover:border-ring/60 active:translate-y-px disabled:opacity-60"
+                    className="group flex min-h-12 w-full items-center gap-3 rounded-xl border bg-card px-3 py-2.5 text-left shadow-(--shadow-sm) transition-[border-color,translate] duration-(--motion-fast) hover:border-ring/60 active:translate-y-px disabled:opacity-60"
                   >
                     <span className="grid size-8 place-items-center rounded-md bg-accent text-accent-foreground">
                       <account.icon className="size-4" aria-hidden="true" />
                     </span>
-                    <span className="grid flex-1 leading-tight">
-                      <span className="text-[0.8125rem] font-medium">{account.role}</span>
-                      <span className="text-xs text-muted-foreground">{account.email}</span>
+                    <span className="grid min-w-0 flex-1 leading-tight">
+                      <span className="truncate text-[0.8125rem] font-medium">{account.role}</span>
+                      <span className="truncate text-xs text-muted-foreground">{account.email}</span>
                     </span>
                     <ArrowRight
                       className="size-4 -translate-x-1 text-muted-foreground opacity-0 transition-[opacity,translate] duration-(--motion-fast) group-hover:translate-x-0 group-hover:opacity-100"

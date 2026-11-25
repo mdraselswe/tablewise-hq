@@ -5,8 +5,6 @@ import type { ComponentProps } from "react";
 import { Button } from "./button.tsx";
 
 const Dialog = DialogPrimitive.Root;
-const DialogTrigger = DialogPrimitive.Trigger;
-const DialogClose = DialogPrimitive.Close;
 
 const overlayClass =
   "fixed inset-0 z-50 bg-[oklch(0.2_0.01_70/0.28)] transition-opacity duration-(--motion-base) ease-(--ease-ui) data-ending-style:opacity-0 data-starting-style:opacity-0 supports-backdrop-filter:backdrop-blur-[2px]";
@@ -23,7 +21,7 @@ function DialogContent({
       <DialogPrimitive.Popup
         data-slot="dialog-content"
         className={cn(
-          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-5 rounded-xl border bg-popover p-5 text-popover-foreground shadow-(--shadow-overlay) outline-none sm:max-w-md",
+          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-5 rounded-2xl border bg-popover p-6 text-popover-foreground shadow-(--shadow-overlay) outline-none sm:max-w-md",
           "transition-[opacity,scale,translate] duration-(--motion-base) ease-(--ease-ui) data-ending-style:scale-[0.97] data-ending-style:opacity-0 data-starting-style:translate-y-[calc(-50%+8px)] data-starting-style:scale-[0.97] data-starting-style:opacity-0",
           className,
         )}
@@ -74,14 +72,4 @@ function DialogDescription({ className, ...props }: DialogPrimitive.Description.
   );
 }
 
-export {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  overlayClass,
-};
+export { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, overlayClass };

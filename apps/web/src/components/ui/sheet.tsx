@@ -6,7 +6,6 @@ import { Button } from "./button.tsx";
 import { overlayClass } from "./dialog.tsx";
 
 const Sheet = SheetPrimitive.Root;
-const SheetClose = SheetPrimitive.Close;
 
 /** A panel that slides in from the right: details that keep the list behind them in view. */
 function SheetContent({ className, children, ...props }: SheetPrimitive.Popup.Props) {
@@ -42,10 +41,6 @@ function SheetBody({ className, ...props }: ComponentProps<"div">) {
   return <div className={cn("flex-1 overflow-y-auto px-5 py-4", className)} {...props} />;
 }
 
-function SheetFooter({ className, ...props }: ComponentProps<"div">) {
-  return <div className={cn("flex gap-2 border-t bg-muted/40 px-5 py-3.5", className)} {...props} />;
-}
-
 function SheetTitle({ className, ...props }: SheetPrimitive.Title.Props) {
   return (
     <SheetPrimitive.Title className={cn("text-base font-semibold tracking-tight", className)} {...props} />
@@ -56,4 +51,4 @@ function SheetDescription({ className, ...props }: SheetPrimitive.Description.Pr
   return <SheetPrimitive.Description className={cn("text-sm text-muted-foreground", className)} {...props} />;
 }
 
-export { Sheet, SheetBody, SheetClose, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle };
+export { Sheet, SheetBody, SheetContent, SheetDescription, SheetHeader, SheetTitle };

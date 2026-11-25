@@ -164,7 +164,7 @@ export function CommandPalette() {
         <DialogPrimitive.Backdrop className={overlayClass} />
         <DialogPrimitive.Popup
           aria-label="Command palette"
-          className="fixed top-[12vh] left-1/2 z-50 w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 overflow-hidden rounded-xl border bg-popover text-popover-foreground shadow-(--shadow-overlay) transition-[opacity,scale] duration-(--motion-base) ease-(--ease-ui) outline-none data-ending-style:scale-[0.98] data-ending-style:opacity-0 data-starting-style:scale-[0.98] data-starting-style:opacity-0"
+          className="fixed top-[12vh] left-1/2 z-50 w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 overflow-hidden rounded-2xl border bg-popover text-popover-foreground shadow-(--shadow-overlay) transition-[opacity,scale] duration-(--motion-base) ease-(--ease-ui) outline-none data-ending-style:scale-[0.98] data-ending-style:opacity-0 data-starting-style:scale-[0.98] data-starting-style:opacity-0"
         >
           <div className="flex items-center gap-2.5 border-b px-4">
             <Search className="size-4 text-muted-foreground" aria-hidden="true" />

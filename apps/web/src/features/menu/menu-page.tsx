@@ -64,9 +64,9 @@ export default function MenuPage() {
         </Button>
       }
     >
-      <Card>
-        <div className="flex flex-wrap items-center gap-2 border-b px-5 py-3">
-          <div className="relative min-w-56 flex-1 sm:max-w-72">
+      <Card className="overflow-clip">
+        <div className="flex flex-wrap items-center gap-2 border-b px-4 py-3 sm:px-5">
+          <div className="relative w-full sm:w-auto sm:max-w-72 sm:min-w-56 sm:flex-1">
             <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={search}
@@ -91,7 +91,7 @@ export default function MenuPage() {
               { value: "all", label: "All categories" },
               ...(categories.data ?? []).map((name) => ({ value: name, label: name })),
             ]}
-            className="w-44"
+            className="min-w-36 flex-1 sm:w-44 sm:flex-none"
           />
           <Segmented
             aria-label="Status"
@@ -123,7 +123,40 @@ export default function MenuPage() {
           </EmptyState>
         ) : (
           <>
-            <Table>
+            {/* Phones: one tappable row per item; the price is what people look for. */}
+            <ul
+              className={cn(
+                "divide-y divide-border/70 md:hidden",
+                items.isPlaceholderData && "opacity-60 transition-opacity",
+              )}
+            >
+              {items.data?.items.map((item) => (
+                <li key={item.id}>
+                  <button
+                    type="button"
+                    onClick={() => openItem(item)}
+                    className="flex min-h-16 w-full items-center gap-3 px-4 py-3 text-left transition-colors outline-none focus-visible:bg-muted/60 active:bg-muted"
+                  >
+                    <div className="grid min-w-0 flex-1 gap-0.5">
+                      <span className="flex min-w-0 items-center gap-2">
+                        <span className="truncate text-sm font-medium">{item.name}</span>
+                        {item.isActive ? null : (
+                          <span className="shrink-0 text-xs text-muted-foreground">Inactive</span>
+                        )}
+                      </span>
+                      <span className="truncate text-xs text-muted-foreground">
+                        {item.category} · <span className="font-mono">{item.sku}</span> ·{" "}
+                        {item.assignedOutletCount} {item.assignedOutletCount === 1 ? "outlet" : "outlets"}
+                      </span>
+                    </div>
+                    <span className="num shrink-0 text-sm font-semibold">
+                      {formatMoney(item.basePriceMinor, { currency: false })}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <Table stickyHeader className="hidden md:table">
               <THead>
                 <TR>
                   <TH>Item</TH>
@@ -167,14 +200,15 @@ export default function MenuPage() {
                 ))}
               </TBody>
             </Table>
-            <footer className="flex items-center justify-between border-t px-5 py-3 text-xs text-muted-foreground">
+            <footer className="flex flex-wrap items-center justify-between gap-3 border-t px-5 py-3 text-xs text-muted-foreground">
               <span className="num">
                 {formatCount(items.data?.total ?? 0)} items · page {page} of {pages}
               </span>
-              <div className="flex gap-2">
+              <div className="flex w-full gap-2 sm:w-auto">
                 <Button
                   variant="outline"
                   size="sm"
+                  className="h-10 flex-1 sm:h-8 sm:flex-none"
                   disabled={page <= 1}
                   onClick={() => setPage((current) => current - 1)}
                 >
@@ -183,6 +217,7 @@ export default function MenuPage() {
                 <Button
                   variant="outline"
                   size="sm"
+                  className="h-10 flex-1 sm:h-8 sm:flex-none"
                   disabled={page >= pages}
                   onClick={() => setPage((current) => current + 1)}
                 >

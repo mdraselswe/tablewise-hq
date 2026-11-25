@@ -1,7 +1,18 @@
 import type { OutletRevenue, OutletTopItems } from "@tablewise/contracts";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { cn } from "cn";
-import { AlertTriangle, ArrowDownRight, ArrowUpRight, PackageCheck, Radio, ReceiptText } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowDownRight,
+  ArrowUpRight,
+  Banknote,
+  type LucideIcon,
+  PackageCheck,
+  Radio,
+  ReceiptText,
+  ShoppingBag,
+  UtensilsCrossed,
+} from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useMemo } from "react";
 import { Link, useSearchParams } from "react-router";
@@ -15,13 +26,16 @@ import {
   trendQuery,
 } from "@/api/resources.ts";
 import { RevenueChart } from "@/components/charts/revenue-chart.tsx";
+import { Sparkline } from "@/components/charts/sparkline.tsx";
 import { Page } from "@/components/layout/page.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
+import { CountUp } from "@/components/ui/count-up.tsx";
 import { Card, CardHeader, EmptyState, FlashOnChange, Skeleton } from "@/components/ui/misc.tsx";
 import { Segmented } from "@/components/ui/segmented.tsx";
 import { Select } from "@/components/ui/select.tsx";
 import { useFreshIds } from "@/hooks/use-fresh-ids.ts";
 import { useNow } from "@/hooks/use-now.ts";
+import { useOutletColors } from "@/hooks/use-outlet-colors.ts";
 import { isRangePreset, RANGE_OPTIONS, type RangePreset, rangeFor } from "@/lib/date-range.ts";
 import {
   addDays,
@@ -32,56 +46,135 @@ import {
   PAYMENT_LABELS,
 } from "@/lib/format.ts";
 
+// Module-level so CountUp's effect does not restart on every render.
+const money = (minor: number) => formatMoney(minor, { whole: true, currency: false });
+const count = (value: number) => formatCount(Math.round(value));
+
 function Delta({ current, previous }: { current: number; previous: number | undefined }) {
   if (previous === undefined) return null;
-  if (previous === 0) return current > 0 ? <span className="text-xs text-muted-foreground">new</span> : null;
+  if (previous === 0)
+    return current > 0 ? (
+      <span className="inline-flex h-6 items-center rounded-full bg-accent px-2 text-xs font-semibold text-accent-foreground">
+        New
+      </span>
+    ) : null;
   const change = (current - previous) / previous;
   const up = change >= 0;
   return (
     <span
       className={cn(
-        "num inline-flex items-center gap-0.5 text-xs font-medium",
-        up ? "text-success" : "text-destructive",
+        "num inline-flex h-6 shrink-0 items-center gap-0.5 rounded-full px-1.5 text-[0.6875rem] font-semibold sm:px-2 sm:text-xs",
+        up ? "bg-success/12 text-success" : "bg-destructive/10 text-destructive",
       )}
+      title="Change against the previous period"
     >
-      {up ? <ArrowUpRight className="size-3.5" /> : <ArrowDownRight className="size-3.5" />}
+      {up ? (
+        <ArrowUpRight className="size-3.5" aria-hidden="true" />
+      ) : (
+        <ArrowDownRight className="size-3.5" aria-hidden="true" />
+      )}
+      <span className="sr-only">{up ? "Up" : "Down"}</span>
       {Math.abs(change * 100).toFixed(1)}%
     </span>
   );
 }
 
+const KPI_TONES = {
+  indigo: "bg-chart-1/12 text-chart-1",
+  teal: "bg-chart-2/12 text-chart-2",
+  amber: "bg-chart-3/14 text-chart-3",
+  rose: "bg-chart-4/12 text-chart-4",
+} as const;
+
 function Kpi({
   label,
+  icon: Icon,
+  tone,
   value,
-  current,
+  format,
+  currency = false,
   previous,
   pending,
+  children,
 }: {
   label: string;
-  value: string;
-  current: number;
+  icon: LucideIcon;
+  tone: keyof typeof KPI_TONES;
+  value: number;
+  format: (value: number) => string;
+  currency?: boolean;
   previous: number | undefined;
   pending: boolean;
+  /** The small chart under the number. */
+  children?: React.ReactNode;
 }) {
   return (
-    <Card className="px-5 py-4">
-      <div className="text-[0.8125rem] text-muted-foreground">{label}</div>
-      {pending ? (
-        <Skeleton className="mt-2 h-8 w-32" />
-      ) : (
-        <div className="mt-1.5 flex items-baseline gap-2.5">
-          <span className="num text-[1.625rem] leading-none font-semibold tracking-tight">
-            <FlashOnChange value={value}>{value}</FlashOnChange>
+    <Card interactive className="flex min-w-0 flex-col gap-2.5 p-4 sm:gap-3 sm:p-5">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span
+            className={cn("grid size-8 shrink-0 place-items-center rounded-lg sm:size-9", KPI_TONES[tone])}
+          >
+            <Icon className="size-4 sm:size-[1.125rem]" aria-hidden="true" />
           </span>
-          <Delta current={current} previous={previous} />
+          <span className="hidden truncate text-sm text-muted-foreground sm:block">{label}</span>
+        </div>
+        {pending ? null : <Delta current={value} previous={previous} />}
+      </div>
+      {/* Phones show two cards a row, so the label drops under the icon there. */}
+      <span className="-mb-1 truncate text-xs text-muted-foreground sm:hidden">{label}</span>
+      {pending ? (
+        <Skeleton className="h-7 w-28 sm:h-8 sm:w-36" />
+      ) : (
+        <div className="num flex min-w-0 items-baseline gap-1 overflow-hidden whitespace-nowrap sm:gap-1.5">
+          {currency ? (
+            <span className="text-[0.6875rem] font-medium text-muted-foreground sm:text-sm">BDT</span>
+          ) : null}
+          <span className="text-xl leading-none font-semibold tracking-tight sm:text-[1.75rem]">
+            <FlashOnChange value={value}>
+              <CountUp value={value} format={format} />
+            </FlashOnChange>
+          </span>
         </div>
       )}
-      <div className="mt-2 text-xs text-muted-foreground">vs previous period</div>
+      <div className="min-h-8">{pending ? <Skeleton className="h-8" /> : children}</div>
+      <div className="-mt-1 hidden text-xs text-muted-foreground sm:block">vs previous period</div>
     </Card>
   );
 }
 
+/** Each outlet's share of a total as one segmented bar, in the outlets' own colours. */
+function ShareBar({ parts }: { parts: { id: string; value: number; color: string; label: string }[] }) {
+  const total = parts.reduce((sum, part) => sum + part.value, 0);
+  if (total === 0) return <div className="mt-3 h-2 rounded-full bg-muted" aria-hidden="true" />;
+  return (
+    <div className="grid gap-2 pt-1">
+      <div className="flex h-2 gap-1 overflow-hidden" role="img" aria-label="Items sold by outlet">
+        {parts.map((part, index) => (
+          <motion.span
+            key={part.id}
+            className="h-full min-w-1 rounded-full"
+            style={{ background: part.color }}
+            initial={{ flexGrow: 0 }}
+            animate={{ flexGrow: part.value }}
+            transition={{ duration: 0.8, delay: index * 0.05, ease: [0.22, 1, 0.36, 1] }}
+          />
+        ))}
+      </div>
+      <div className="flex flex-wrap gap-x-3 gap-y-1 text-[0.6875rem] text-muted-foreground">
+        {parts.map((part) => (
+          <span key={part.id} className="inline-flex items-center gap-1">
+            <span className="size-1.5 rounded-full" style={{ background: part.color }} aria-hidden="true" />
+            {part.label}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function OutletRevenueList({ outlets, total }: { outlets: OutletRevenue[]; total: number }) {
+  const colorOf = useOutletColors();
   const sorted = [...outlets].sort((a, b) => b.revenueMinor - a.revenueMinor);
   const max = Math.max(...sorted.map((outlet) => outlet.revenueMinor), 1);
   return (
@@ -90,18 +183,24 @@ function OutletRevenueList({ outlets, total }: { outlets: OutletRevenue[]; total
         <li key={outlet.outletId}>
           <Link to={`/hq/outlets/${outlet.outletId}`} className="group grid gap-1.5">
             <div className="flex items-baseline justify-between gap-3 text-[0.8125rem]">
-              <span className="font-medium group-hover:underline">
-                {outlet.outletName}{" "}
+              <span className="inline-flex min-w-0 items-center gap-2 font-medium">
+                <span
+                  className="size-2.5 shrink-0 rounded-[3px]"
+                  style={{ background: colorOf(outlet.outletId) }}
+                  aria-hidden="true"
+                />
+                <span className="truncate group-hover:underline">{outlet.outletName}</span>
                 <span className="text-xs font-normal text-muted-foreground">{outlet.outletCode}</span>
               </span>
               <span className="num font-semibold">{formatMoney(outlet.revenueMinor, { whole: true })}</span>
             </div>
             <div className="h-2 overflow-hidden rounded-full bg-muted">
               <motion.div
-                className="h-full rounded-full bg-chart-1"
+                className="h-full rounded-full"
+                style={{ background: colorOf(outlet.outletId) }}
                 initial={{ width: 0 }}
                 animate={{ width: `${(outlet.revenueMinor / max) * 100}%` }}
-                transition={{ duration: 0.7, delay: index * 0.06, ease: [0.16, 1, 0.3, 1] }}
+                transition={{ duration: 0.8, delay: index * 0.06, ease: [0.22, 1, 0.36, 1] }}
               />
             </div>
             <div className="num flex justify-between text-xs text-muted-foreground">
@@ -119,11 +218,21 @@ function OutletRevenueList({ outlets, total }: { outlets: OutletRevenue[]; total
 }
 
 function TopItemsCard({ outlet }: { outlet: OutletTopItems }) {
+  const colorOf = useOutletColors();
   const max = Math.max(...outlet.items.map((item) => item.quantity), 1);
   return (
     <Card>
       <CardHeader
-        title={outlet.outletName}
+        title={
+          <span className="inline-flex min-w-0 items-center gap-2">
+            <span
+              className="size-2.5 shrink-0 rounded-[3px]"
+              style={{ background: colorOf(outlet.outletId) }}
+              aria-hidden="true"
+            />
+            <span className="truncate">{outlet.outletName}</span>
+          </span>
+        }
         description={`Top ${outlet.items.length || 5} by quantity`}
         action={<Badge tone="outline">{outlet.outletCode}</Badge>}
       />
@@ -134,12 +243,12 @@ function TopItemsCard({ outlet }: { outlet: OutletTopItems }) {
           {outlet.items.map((item) => (
             <li
               key={item.menuItemId}
-              className="grid grid-cols-[1.25rem_1fr_auto] items-center gap-x-3 gap-y-1"
+              className="grid grid-cols-[1.5rem_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1"
             >
               <span
                 className={cn(
-                  "num text-center text-xs font-semibold",
-                  item.rank === 1 ? "text-gold" : "text-muted-foreground",
+                  "num grid size-6 place-items-center rounded-md text-xs font-semibold",
+                  item.rank === 1 ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground",
                 )}
               >
                 {item.rank}
@@ -147,10 +256,13 @@ function TopItemsCard({ outlet }: { outlet: OutletTopItems }) {
               <span className="truncate text-[0.8125rem] font-medium">{item.itemName}</span>
               <span className="num text-right text-[0.8125rem]">{formatCount(item.quantity)}</span>
               <span />
-              <div className="h-1 overflow-hidden rounded-full bg-muted">
-                <div
-                  className="h-full rounded-full bg-chart-2"
-                  style={{ width: `${(item.quantity / max) * 100}%` }}
+              <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                <motion.div
+                  className="h-full rounded-full"
+                  style={{ background: colorOf(outlet.outletId) }}
+                  initial={{ width: 0 }}
+                  animate={{ width: `${(item.quantity / max) * 100}%` }}
+                  transition={{ duration: 0.8, delay: item.rank * 0.05, ease: [0.22, 1, 0.36, 1] }}
                 />
               </div>
               <span className="num text-right text-xs text-muted-foreground">
@@ -177,6 +289,7 @@ function LiveFeed({
     outletId ?? "all",
   );
   const now = useNow(30_000);
+  const colorOf = useOutletColors();
   return (
     <Card className="flex flex-col">
       <CardHeader
@@ -216,6 +329,11 @@ function LiveFeed({
                   fresh.has(sale.id) && "flash",
                 )}
               >
+                <span
+                  className="size-2 shrink-0 rounded-full"
+                  style={{ background: colorOf(sale.outletId) }}
+                  aria-hidden="true"
+                />
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-[0.8125rem] font-medium">
                     {outletNames.get(sale.outletId) ?? "Outlet"}
@@ -324,6 +442,12 @@ export default function DashboardPage() {
   const revenue = useQuery(revenueQuery({ ...range, outletId }));
   const previous = useQuery(revenueQuery({ ...previousRange, outletId }));
   const trend = useQuery(trendQuery({ ...trendRange, outletId }));
+  const trendDays = (Date.parse(trendRange.to) - Date.parse(trendRange.from)) / 86_400_000 + 1;
+  const previousTrend = useQuery(
+    trendQuery({ from: addDays(trendRange.from, -trendDays), to: addDays(trendRange.from, -1), outletId }),
+  );
+  const colorOf = useOutletColors();
+  const daily = trend.data?.points ?? [];
   const top = useQuery(topItemsQuery({ ...range, outletId, limit: 5 }));
 
   const totals = revenue.data?.totals;
@@ -343,7 +467,6 @@ export default function DashboardPage() {
 
   return (
     <Page
-      wide
       title="Overview"
       description="Revenue, best sellers and stock across every outlet, updated live."
       actions={
@@ -371,45 +494,103 @@ export default function DashboardPage() {
         </>
       }
     >
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-(--page-gap) xl:grid-cols-4">
         <Kpi
           label="Revenue"
-          value={formatMoney(totals?.revenueMinor ?? 0, { whole: true })}
-          current={totals?.revenueMinor ?? 0}
+          icon={Banknote}
+          tone="indigo"
+          currency
+          value={totals?.revenueMinor ?? 0}
+          format={money}
           previous={before?.revenueMinor}
           pending={revenue.isPending}
-        />
+        >
+          <Sparkline
+            values={daily.map((point) => point.revenueMinor)}
+            color="var(--chart-1)"
+            label="Daily revenue"
+          />
+        </Kpi>
         <Kpi
           label="Sales"
-          value={formatCount(totals?.saleCount ?? 0)}
-          current={totals?.saleCount ?? 0}
+          icon={ReceiptText}
+          tone="teal"
+          value={totals?.saleCount ?? 0}
+          format={count}
           previous={before?.saleCount}
           pending={revenue.isPending}
-        />
+        >
+          <Sparkline
+            values={daily.map((point) => point.saleCount)}
+            color="var(--chart-2)"
+            label="Daily sales"
+          />
+        </Kpi>
         <Kpi
           label="Average ticket"
-          value={formatMoney(totals?.averageTicketMinor ?? 0, { whole: true })}
-          current={totals?.averageTicketMinor ?? 0}
+          icon={ShoppingBag}
+          tone="amber"
+          currency
+          value={totals?.averageTicketMinor ?? 0}
+          format={money}
           previous={before?.averageTicketMinor}
           pending={revenue.isPending}
-        />
+        >
+          <Sparkline
+            values={daily.map((point) => (point.saleCount ? point.revenueMinor / point.saleCount : 0))}
+            color="var(--chart-3)"
+            label="Daily average ticket"
+          />
+        </Kpi>
         <Kpi
           label="Items sold"
-          value={formatCount(totals?.itemsSold ?? 0)}
-          current={totals?.itemsSold ?? 0}
+          icon={UtensilsCrossed}
+          tone="rose"
+          value={totals?.itemsSold ?? 0}
+          format={count}
           previous={before?.itemsSold}
           pending={revenue.isPending}
-        />
+        >
+          <ShareBar
+            parts={[...(revenue.data?.outlets ?? [])]
+              .sort((a, b) => a.outletCode.localeCompare(b.outletCode))
+              .map((outlet) => ({
+                id: outlet.outletId,
+                value: outlet.itemsSold,
+                color: colorOf(outlet.outletId),
+                label: outlet.outletCode,
+              }))}
+          />
+        </Kpi>
       </div>
 
-      <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+      <div className="grid gap-(--page-gap) xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <Card>
           <CardHeader
             title="Revenue trend"
             description={`Daily revenue, ${trend.data?.points.length ?? 0} days`}
+            action={
+              <div className="hidden items-center gap-4 text-xs text-muted-foreground sm:flex">
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="h-[3px] w-3.5 rounded-full bg-chart-1" aria-hidden="true" />
+                  This period
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <span
+                    className="w-3.5 border-t-2 border-dashed border-muted-foreground/60"
+                    aria-hidden="true"
+                  />
+                  Previous
+                </span>
+              </div>
+            }
           />
           <div className="px-3 pb-4">
-            {trend.data ? <RevenueChart points={trend.data.points} /> : <Skeleton className="mx-2 h-60" />}
+            {trend.data ? (
+              <RevenueChart points={trend.data.points} previous={previousTrend.data?.points} />
+            ) : (
+              <Skeleton className="mx-2 h-64" />
+            )}
           </div>
         </Card>
         <Card>
@@ -422,18 +603,20 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+      <div className="grid gap-(--page-gap) xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <section aria-labelledby="top-items-heading">
           <h2 id="top-items-heading" className="mb-3 text-[0.9375rem] font-semibold tracking-tight">
             Top 5 items per outlet
           </h2>
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-(--page-gap) md:grid-cols-2">
             {top.data
               ? top.data.outlets.map((outlet) => <TopItemsCard key={outlet.outletId} outlet={outlet} />)
-              : Array.from({ length: 4 }, (_, index) => <Skeleton key={index} className="h-60 rounded-xl" />)}
+              : Array.from({ length: 4 }, (_, index) => (
+                  <Skeleton key={index} className="h-60 rounded-(--radius-card)" />
+                ))}
           </div>
         </section>
-        <div className="grid content-start gap-4 xl:pt-9">
+        <div className="grid content-start gap-(--page-gap) xl:pt-9">
           <LiveFeed outletId={outletId} outletNames={outletNames} />
           <LowStockCard outletIds={visibleOutletIds} outletNames={outletNames} />
         </div>

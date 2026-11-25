@@ -9,11 +9,13 @@ import { Page } from "@/components/layout/page.tsx";
 import { Badge, StatusDot } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, EmptyState, FlashOnChange, Skeleton } from "@/components/ui/misc.tsx";
+import { useOutletColors } from "@/hooks/use-outlet-colors.ts";
 import { rangeFor } from "@/lib/date-range.ts";
 import { formatCount, formatMoney } from "@/lib/format.ts";
 import { OutletDialog, type OutletDialogState } from "./outlet-dialog.tsx";
 
 export default function OutletsPage() {
+  const colorOf = useOutletColors();
   const [params, setParams] = useSearchParams();
   const outlets = useQuery(outletsQuery);
   const today = useQuery(revenueQuery(rangeFor("today")));
@@ -42,9 +44,9 @@ export default function OutletsPage() {
       }
     >
       {outlets.isPending ? (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-(--page-gap) sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
           {Array.from({ length: 4 }, (_, index) => (
-            <Skeleton key={index} className="h-52 rounded-xl" />
+            <Skeleton key={index} className="h-52 rounded-(--radius-card)" />
           ))}
         </div>
       ) : outlets.data?.length === 0 ? (
@@ -54,7 +56,7 @@ export default function OutletsPage() {
           </EmptyState>
         </Card>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-(--page-gap) sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
           {outlets.data?.map((outlet, index) => {
             const day = todayById.get(outlet.id);
             const seven = weekById.get(outlet.id);
@@ -68,25 +70,32 @@ export default function OutletsPage() {
                 <Link
                   to={`/hq/outlets/${outlet.id}`}
                   className={cn(
-                    "group block h-full rounded-xl bg-card p-5 shadow-(--shadow-card) transition-[box-shadow,translate] duration-(--motion-base) ease-(--ease-ui) hover:-translate-y-0.5 hover:shadow-(--shadow-overlay)",
+                    "group block h-full rounded-(--radius-card) bg-card p-5 shadow-(--shadow-card) transition-[box-shadow,translate] duration-(--motion-base) ease-(--ease-ui) hover:-translate-y-0.5 hover:shadow-(--shadow-lift)",
                     !outlet.isActive && "opacity-70",
                   )}
                 >
                   <div className="flex items-start justify-between gap-3">
-                    <div className="grid gap-1">
-                      <div className="flex items-center gap-2">
-                        <h2 className="text-[0.9375rem] font-semibold tracking-tight">{outlet.name}</h2>
+                    <div className="grid min-w-0 gap-1">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <span
+                          className="size-2.5 shrink-0 rounded-[3px]"
+                          style={{ background: colorOf(outlet.id) }}
+                          aria-hidden="true"
+                        />
+                        <h2 className="truncate text-[0.9375rem] font-semibold tracking-tight">
+                          {outlet.name}
+                        </h2>
                         <Badge tone="outline" className="font-mono">
                           {outlet.code}
                         </Badge>
                       </div>
-                      <p className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <MapPin className="size-3" aria-hidden="true" />
-                        {outlet.address ?? "No address"}
+                      <p className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
+                        <MapPin className="size-3 shrink-0" aria-hidden="true" />
+                        <span className="truncate">{outlet.address ?? "No address"}</span>
                       </p>
                     </div>
                     <ArrowUpRight
-                      className="size-4 text-muted-foreground transition-transform duration-(--motion-fast) group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
+                      className="size-4 shrink-0 text-muted-foreground transition-transform duration-(--motion-fast) group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
                       aria-hidden="true"
                     />
                   </div>

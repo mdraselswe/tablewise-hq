@@ -24,9 +24,11 @@ describe("dates and timers", () => {
     expect(addDays("2026-03-01", -1)).toBe("2026-02-28");
   });
 
-  it("formats elapsed time as m:ss", () => {
+  it("formats elapsed time as m:ss, then in hours past the first hour", () => {
     const start = "2026-11-24T10:00:00Z";
     expect(formatElapsed(start, Date.parse("2026-11-24T10:04:07Z"))).toBe("4:07");
     expect(formatElapsed(start, Date.parse("2026-11-24T09:59:00Z"))).toBe("0:00");
+    expect(formatElapsed(start, Date.parse("2026-11-24T11:05:30Z"))).toBe("1h 05m");
+    expect(formatElapsed(start, Date.parse("2026-11-24T22:12:00Z"))).toBe("12h 12m");
   });
 });

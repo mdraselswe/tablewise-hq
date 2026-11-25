@@ -3,12 +3,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn } from "cn";
 import { ChefHat, Undo2 } from "lucide-react";
 import { AnimatePresence, LayoutGroup, motion } from "motion/react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { keys } from "@/api/keys.ts";
 import { kitchenApi, kitchenQuery } from "@/api/resources.ts";
 import { Page } from "@/components/layout/page.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { EmptyState, Skeleton } from "@/components/ui/misc.tsx";
+import { Segmented } from "@/components/ui/segmented.tsx";
 import { useSessionUser } from "@/features/auth/session.ts";
 import { useNow } from "@/hooks/use-now.ts";
 import { formatElapsed, formatTime } from "@/lib/format.ts";
@@ -56,7 +57,7 @@ function TicketCard({
       exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.18 } }}
       transition={{ type: "spring", bounce: 0.1, duration: 0.45 }}
       className={cn(
-        "rounded-xl border bg-card shadow-(--shadow-card)",
+        "rounded-(--radius-card) border bg-card shadow-(--shadow-card)",
         late && "border-destructive/50 ring-1 ring-destructive/20",
         warn && "border-warning/60",
       )}
@@ -96,6 +97,7 @@ function TicketCard({
           <Button
             variant="outline"
             size="icon-sm"
+            className="size-10 md:size-(--control-h-sm)"
             onClick={() => onMove(back)}
             aria-label={`Move ${ticket.receiptNo} back`}
           >
@@ -105,7 +107,7 @@ function TicketCard({
         {next ? (
           <Button
             size="sm"
-            className="flex-1"
+            className="h-10 flex-1 md:h-(--control-h-sm)"
             variant={ticket.status === "READY" ? "outline" : "default"}
             onClick={() => onMove(next)}
           >
@@ -123,6 +125,8 @@ export default function KitchenPage() {
   const queryClient = useQueryClient();
   const board = useQuery({ ...kitchenQuery(outletId), refetchInterval: 60_000 });
   const now = useNow(1000);
+  // Phones show one column at a time; three stacked columns meant scrolling past New to reach Ready.
+  const [shown, setShown] = useState<BoardStatus>("NEW");
   const boardKey = keys.kitchen.board(outletId);
 
   const move = useMutation({
@@ -159,11 +163,10 @@ export default function KitchenPage() {
 
   return (
     <Page
-      wide
       title="Kitchen display"
       description="New orders appear here the moment they are paid. Tap to move them along."
       actions={
-        <div className="flex items-center gap-4 text-[0.8125rem] text-muted-foreground">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[0.8125rem] text-muted-foreground">
           <span className="inline-flex items-center gap-1.5">
             <span className="size-2 rounded-sm bg-warning" /> {WARN_AFTER_MIN}+ min
           </span>
@@ -175,21 +178,34 @@ export default function KitchenPage() {
       }
     >
       {board.isPending ? (
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-(--page-gap) md:grid-cols-3">
           {COLUMNS.map((column) => (
-            <Skeleton key={column.status} className="h-96 rounded-xl" />
+            <Skeleton key={column.status} className="h-96 rounded-(--radius-card)" />
           ))}
         </div>
       ) : (
         <LayoutGroup>
-          <div className="grid items-start gap-4 md:grid-cols-3">
+          <Segmented
+            aria-label="Column"
+            value={shown}
+            onChange={setShown}
+            options={COLUMNS.map((column) => ({
+              value: column.status,
+              label: `${column.status === "READY" ? "Ready" : column.title} ${columns.get(column.status)?.length ?? 0}`,
+            }))}
+            className="flex w-full md:hidden"
+          />
+          <div className="grid items-start gap-(--page-gap) md:grid-cols-3">
             {COLUMNS.map((column) => {
               const tickets = columns.get(column.status) ?? [];
               return (
                 <section
                   key={column.status}
                   aria-label={column.title}
-                  className="min-h-[60vh] rounded-xl bg-secondary/60 p-2.5"
+                  className={cn(
+                    "rounded-(--radius-card) bg-secondary/60 p-2.5 md:block md:min-h-[60vh]",
+                    column.status === shown ? "block" : "hidden",
+                  )}
                 >
                   <header className="flex items-center justify-between px-1.5 pt-1 pb-3">
                     <h2 className="inline-flex items-center gap-2 text-[0.8125rem] font-semibold">
@@ -221,7 +237,7 @@ export default function KitchenPage() {
             })}
           </div>
           {total === 0 ? (
-            <EmptyState icon={<ChefHat />} title="All caught up" className="mt-2">
+            <EmptyState icon={<ChefHat />} title="All caught up">
               Paid orders from the counter show up here instantly.
             </EmptyState>
           ) : null}

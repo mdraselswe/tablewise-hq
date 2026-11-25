@@ -1,10 +1,27 @@
 import { cn } from "cn";
 import type { ComponentProps } from "react";
 
-/** Dense, calm tables: hairline rows, muted headers, numbers right-aligned and tabular. */
-function Table({ className, ...props }: ComponentProps<"table">) {
+/**
+ * Dense, calm tables: hairline rows, muted headers, numbers right-aligned and tabular.
+ *
+ * `stickyHeader` keeps the column names under the top bar while a long table scrolls.
+ * A sideways-scrolling box would trap a sticky header inside it, so from 1280px up, where
+ * every table here fits, the box clips instead of scrolling; narrower screens keep the
+ * sideways scroll (and phones get lists instead of these tables anyway).
+ */
+function Table({
+  className,
+  stickyHeader = false,
+  ...props
+}: ComponentProps<"table"> & { stickyHeader?: boolean }) {
   return (
-    <div className="relative w-full overflow-x-auto">
+    <div
+      className={cn(
+        "relative w-full overflow-x-auto",
+        stickyHeader &&
+          "xl:overflow-x-clip xl:[&_th]:sticky xl:[&_th]:top-(--shell-top) xl:[&_th]:z-10 xl:[&_th]:bg-card xl:[&_th]:shadow-[inset_0_-1px_0_var(--border)]",
+      )}
+    >
       <table className={cn("w-full caption-bottom border-collapse text-[0.8125rem]", className)} {...props} />
     </div>
   );
